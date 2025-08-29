@@ -9,30 +9,36 @@ public class ChatMessageModel {
     private Timestamp timestamp;
     private int status;
     private List<String> searchKeywords;
+    private String type; // Novo campo: "text" ou "image"
 
-    // VARIÁVEIS DE STATUS ADICIONADAS AQUI
     public static final int STATUS_SENT = 0;
     public static final int STATUS_READ = 1;
 
     public ChatMessageModel() {
     }
 
-    public ChatMessageModel(String message, String senderId, Timestamp timestamp, int status, List<String> searchKeywords) {
+    // Construtor atualizado
+    public ChatMessageModel(String message, String senderId, Timestamp timestamp, int status, List<String> searchKeywords, String type) {
         this.message = message;
         this.senderId = senderId;
         this.timestamp = timestamp;
         this.status = status;
         this.searchKeywords = searchKeywords;
+        this.type = type;
     }
 
-    public List<String> getSearchKeywords() {
-        return searchKeywords;
+    // Getter e Setter para o novo campo
+    public String getType() {
+        return type;
     }
 
-    public void setSearchKeywords(List<String> searchKeywords) {
-        this.searchKeywords = searchKeywords;
+    public void setType(String type) {
+        this.type = type;
     }
 
+    // Getters e Setters existentes
+    public List<String> getSearchKeywords() { return searchKeywords; }
+    public void setSearchKeywords(List<String> searchKeywords) { this.searchKeywords = searchKeywords; }
     public String getMessage() { return message; }
     public void setMessage(String message) { this.message = message; }
     public String getSenderId() { return senderId; }

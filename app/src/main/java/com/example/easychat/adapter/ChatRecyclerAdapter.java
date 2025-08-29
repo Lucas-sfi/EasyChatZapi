@@ -1,6 +1,7 @@
 package com.example.easychat.adapter;
 
 import android.content.Context;
+import android.content.DialogInterface;
 import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -8,11 +9,10 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
-
 import com.example.easychat.R;
 import com.example.easychat.model.ChatMessageModel;
 import com.example.easychat.utils.FirebaseUtil;
@@ -22,18 +22,19 @@ import com.firebase.ui.firestore.FirestoreRecyclerOptions;
 public class ChatRecyclerAdapter extends FirestoreRecyclerAdapter<ChatMessageModel, ChatRecyclerAdapter.ChatModelViewHolder> {
 
     Context context;
-    private String highlightedMessageId = null; // ID da mensagem a ser destacada
+    private String highlightedMessageId = null;
+    private PinMessageListener pinMessageListener; // Interface para comunicar com a Activity
 
-    public ChatRecyclerAdapter(@NonNull FirestoreRecyclerOptions<ChatMessageModel> options, Context context) {
+    public ChatRecyclerAdapter(@NonNull FirestoreRecyclerOptions<ChatMessageModel> options, Context context, PinMessageListener listener) {
         super(options);
         this.context = context;
+        this.pinMessageListener = listener;
     }
 
     @Override
     protected void onBindViewHolder(@NonNull ChatModelViewHolder holder, int position, @NonNull ChatMessageModel model) {
         String currentMessageId = getSnapshots().getSnapshot(position).getId();
 
-        // LÓGICA DE DESTAQUE
         if (currentMessageId.equals(highlightedMessageId)) {
             holder.itemView.setBackgroundColor(ContextCompat.getColor(context, R.color.my_secondary));
         } else {
@@ -58,6 +59,22 @@ public class ChatRecyclerAdapter extends FirestoreRecyclerAdapter<ChatMessageMod
             holder.leftChatLayout.setVisibility(View.VISIBLE);
             holder.leftChatTextview.setText(model.getMessage());
         }
+
+        // Listener para clique longo na mensagem
+        holder.itemView.setOnLongClickListener(v -> {
+            showPinMessageDialog(currentMessageId);
+            return true;
+        });
+    }
+
+    private void showPinMessageDialog(String messageId) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(context);
+        builder.setItems(new CharSequence[]{"Pin Message"}, (dialog, which) -> {
+            if (which == 0) {
+                pinMessageListener.onPinMessageClicked(messageId);
+            }
+        });
+        builder.create().show();
     }
 
     @NonNull
@@ -67,7 +84,6 @@ public class ChatRecyclerAdapter extends FirestoreRecyclerAdapter<ChatMessageMod
         return new ChatModelViewHolder(view);
     }
 
-    // Método para definir qual mensagem destacar
     public void highlightMessage(String messageId) {
         highlightedMessageId = messageId;
         notifyDataSetChanged();
@@ -86,5 +102,10 @@ public class ChatRecyclerAdapter extends FirestoreRecyclerAdapter<ChatMessageMod
             rightChatTextview = itemView.findViewById(R.id.right_chat_textview);
             statusIcon = itemView.findViewById(R.id.message_status_icon);
         }
+    }
+
+    // Interface para comunicar a ação de fixar
+    public interface PinMessageListener {
+        void onPinMessageClicked(String messageId);
     }
 }
