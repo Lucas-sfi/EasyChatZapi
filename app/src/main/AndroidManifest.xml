@@ -19,6 +19,22 @@
             android:resource="@color/my_primary"/>
 
         <activity
+            android:name=".UserSettingsActivity"
+            android:exported="false">
+            <meta-data
+                android:name="android.app.lib_name"
+                android:value="" />
+        </activity>
+
+        <activity
+            android:name=".GroupSettingsActivity"
+            android:exported="false">
+            <meta-data
+                android:name="android.app.lib_name"
+                android:value="" />
+        </activity>
+
+        <activity
             android:name=".CreateGroupActivity"
             android:exported="false">
             <meta-data

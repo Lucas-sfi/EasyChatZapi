@@ -22,15 +22,27 @@ public class SelectUserRecyclerAdapter extends FirestoreRecyclerAdapter<UserMode
 
     private Context context;
     private ArrayList<String> selectedUserIds;
+    private ArrayList<String> currentMembers; // Lista de membros já existentes
 
-    public SelectUserRecyclerAdapter(@NonNull FirestoreRecyclerOptions<UserModel> options, Context context) {
+    public SelectUserRecyclerAdapter(@NonNull FirestoreRecyclerOptions<UserModel> options, Context context, ArrayList<String> currentMembers) {
         super(options);
         this.context = context;
         this.selectedUserIds = new ArrayList<>();
+        this.currentMembers = currentMembers;
     }
 
     @Override
     protected void onBindViewHolder(@NonNull UserModelViewHolder holder, int position, @NonNull UserModel model) {
+        // Se o usuário já for um membro, oculta o item da lista
+        if (currentMembers.contains(model.getUserId())) {
+            holder.itemView.setVisibility(View.GONE);
+            holder.itemView.setLayoutParams(new RecyclerView.LayoutParams(0, 0));
+            return;
+        }
+
+        holder.itemView.setVisibility(View.VISIBLE);
+        holder.itemView.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
         holder.usernameText.setText(model.getUsername());
         holder.phoneText.setText(model.getPhone());
 
@@ -42,11 +54,9 @@ public class SelectUserRecyclerAdapter extends FirestoreRecyclerAdapter<UserMode
                     }
                 });
 
-        // Marcar o checkbox se o usuário já estiver selecionado
         holder.checkBox.setChecked(selectedUserIds.contains(model.getUserId()));
 
         holder.itemView.setOnClickListener(v -> {
-            // Inverte o estado do checkbox ao clicar no item
             holder.checkBox.setChecked(!holder.checkBox.isChecked());
         });
 

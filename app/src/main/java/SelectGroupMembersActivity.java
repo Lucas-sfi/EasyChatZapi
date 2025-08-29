@@ -8,12 +8,14 @@ import android.os.Bundle;
 import android.widget.ImageButton;
 import android.widget.Toast;
 import com.example.easychat.adapter.SelectUserRecyclerAdapter;
+import com.example.easychat.model.ChatroomModel;
 import com.example.easychat.model.UserModel;
 import com.example.easychat.utils.FirebaseUtil;
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.firebase.firestore.Query;
 import java.util.ArrayList;
+import java.util.List;
 
 public class SelectGroupMembersActivity extends AppCompatActivity {
 
@@ -21,6 +23,8 @@ public class SelectGroupMembersActivity extends AppCompatActivity {
     private SelectUserRecyclerAdapter adapter;
     private ImageButton backButton;
     private FloatingActionButton nextButton;
+    private ArrayList<String> currentMembers;
+    private String chatroomId; // Será preenchido se estivermos adicionando membros
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -31,21 +35,49 @@ public class SelectGroupMembersActivity extends AppCompatActivity {
         backButton = findViewById(R.id.back_btn);
         nextButton = findViewById(R.id.next_btn);
 
+        currentMembers = getIntent().getStringArrayListExtra("currentMembers");
+        chatroomId = getIntent().getStringExtra("chatroomId");
+
+        if (currentMembers == null) {
+            currentMembers = new ArrayList<>();
+        }
+
         setupRecyclerView();
 
         backButton.setOnClickListener(v -> onBackPressed());
 
         nextButton.setOnClickListener(v -> {
             ArrayList<String> selectedIds = adapter.getSelectedUserIds();
-            // Para um grupo, precisamos de pelo menos 1 outro membro.
             if (selectedIds.isEmpty()) {
-                Toast.makeText(this, "Select at least 1 member", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Select at least 1 member to add", Toast.LENGTH_SHORT).show();
                 return;
             }
-            // A lógica agora inicia a CreateGroupActivity
-            Intent intent = new Intent(this, CreateGroupActivity.class);
-            intent.putStringArrayListExtra("userIds", selectedIds);
-            startActivity(intent);
+
+            if (chatroomId != null) {
+                // Modo: Adicionar membros a um grupo existente
+                addMembersToGroup(selectedIds);
+            } else {
+                // Modo: Criar um novo grupo
+                Intent intent = new Intent(this, CreateGroupActivity.class);
+                intent.putStringArrayListExtra("userIds", selectedIds);
+                startActivity(intent);
+            }
+        });
+    }
+
+    private void addMembersToGroup(ArrayList<String> newMemberIds) {
+        FirebaseUtil.getChatroomReference(chatroomId).get().addOnSuccessListener(documentSnapshot -> {
+            ChatroomModel chatroomModel = documentSnapshot.toObject(ChatroomModel.class);
+            if (chatroomModel != null) {
+                List<String> updatedUserIds = chatroomModel.getUserIds();
+                updatedUserIds.addAll(newMemberIds);
+                chatroomModel.setUserIds(updatedUserIds);
+
+                FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel).addOnSuccessListener(aVoid -> {
+                    Toast.makeText(this, "Members added successfully", Toast.LENGTH_SHORT).show();
+                    finish();
+                });
+            }
         });
     }
 
@@ -56,7 +88,8 @@ public class SelectGroupMembersActivity extends AppCompatActivity {
         FirestoreRecyclerOptions<UserModel> options = new FirestoreRecyclerOptions.Builder<UserModel>()
                 .setQuery(query, UserModel.class).build();
 
-        adapter = new SelectUserRecyclerAdapter(options, getApplicationContext());
+        // Passar os membros atuais para o adapter
+        adapter = new SelectUserRecyclerAdapter(options, getApplicationContext(), currentMembers);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         recyclerView.setAdapter(adapter);
     }

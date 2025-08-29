@@ -65,7 +65,6 @@ public class ChatActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_chat);
 
-        // Inicializar Views
         messageInput = findViewById(R.id.chat_message_input);
         sendMessageBtn = findViewById(R.id.message_send_btn);
         backBtn = findViewById(R.id.back_btn);
@@ -76,12 +75,9 @@ public class ChatActivity extends AppCompatActivity {
 
         backBtn.setOnClickListener(v -> onBackPressed());
 
-        // Obter o ID da sala de chat do Intent
         chatroomId = getIntent().getStringExtra("chatroomId");
-        // Obter o UserModel (pode ser nulo se for um grupo)
         otherUser = AndroidUtil.getUserModelFromIntent(getIntent());
 
-        // Buscar dados da sala de chat e configurar a UI
         getChatroomData();
 
         sendMessageBtn.setOnClickListener(v -> {
@@ -96,8 +92,11 @@ public class ChatActivity extends AppCompatActivity {
             if (task.isSuccessful()) {
                 chatroomModel = task.getResult().toObject(ChatroomModel.class);
                 if (chatroomModel == null) {
-                    Toast.makeText(this, "Chatroom not found", Toast.LENGTH_SHORT).show();
-                    finish();
+                    // Se a conversa foi deletada, não tente carregar
+                    if (!isFinishing()) {
+                        Toast.makeText(this, "Chat not found", Toast.LENGTH_SHORT).show();
+                        finish();
+                    }
                     return;
                 }
                 updateUI();
@@ -111,15 +110,15 @@ public class ChatActivity extends AppCompatActivity {
 
     private void updateUI() {
         if (chatroomModel.isGroupChat()) {
-            // Configurar UI para Grupo
             toolbarTitle.setText(chatroomModel.getGroupName());
             toolbarProfilePic.setImageResource(R.drawable.chat_icon);
             toolbar.setOnClickListener(v -> {
-                // ABRIR CONFIGURAÇÕES DO GRUPO (PRÓXIMO PASSO)
-                Toast.makeText(this, "Group settings coming soon!", Toast.LENGTH_SHORT).show();
+                Intent intent = new Intent(this, GroupSettingsActivity.class);
+                intent.putExtra("chatroomId", chatroomId);
+                startActivity(intent);
             });
         } else {
-            // Configurar UI para Chat Individual
+            // LÓGICA DE CLIQUE ATIVADA PARA CHAT INDIVIDUAL
             if (otherUser != null) {
                 toolbarTitle.setText(otherUser.getUsername());
                 FirebaseUtil.getOtherProfilePicStorageRef(otherUser.getUserId()).getDownloadUrl()
@@ -129,6 +128,12 @@ public class ChatActivity extends AppCompatActivity {
                                 AndroidUtil.setProfilePic(this, uri, toolbarProfilePic);
                             }
                         });
+                toolbar.setOnClickListener(v -> {
+                    Intent intent = new Intent(this, UserSettingsActivity.class);
+                    intent.putExtra("chatroomId", chatroomId);
+                    AndroidUtil.passUserModelAsIntent(intent, otherUser);
+                    startActivity(intent);
+                });
             }
         }
     }
@@ -169,7 +174,6 @@ public class ChatActivity extends AppCompatActivity {
                 .addOnCompleteListener(task -> {
                     if (task.isSuccessful()) {
                         messageInput.setText("");
-                        // Lógica de notificação pode ser ajustada para grupos depois
                         if (!chatroomModel.isGroupChat() && otherUser != null) {
                             sendNotification(message);
                         }
@@ -179,7 +183,6 @@ public class ChatActivity extends AppCompatActivity {
 
     void sendNotification(String message) {
         if (otherUser == null || otherUser.getFcmToken() == null) return;
-
         FirebaseUtil.currentUserDetails().get().addOnCompleteListener(task -> {
             if (task.isSuccessful()) {
                 UserModel currentUser = task.getResult().toObject(UserModel.class);
