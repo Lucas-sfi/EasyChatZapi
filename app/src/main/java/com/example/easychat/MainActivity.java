@@ -13,7 +13,7 @@ import com.example.easychat.utils.FirebaseUtil;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
-import com.google.android.material.floatingactionbutton.FloatingActionButton; // Import adicionado
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.navigation.NavigationBarView;
 import com.google.firebase.messaging.FirebaseMessaging;
 
@@ -21,7 +21,7 @@ public class MainActivity extends AppCompatActivity {
 
     BottomNavigationView bottomNavigationView;
     ImageButton searchButton;
-    FloatingActionButton addNewChatBtn; // Variável para o novo botão
+    FloatingActionButton addNewChatBtn;
 
     ChatFragment chatFragment;
     ProfileFragment profileFragment;
@@ -36,16 +36,16 @@ public class MainActivity extends AppCompatActivity {
 
         bottomNavigationView = findViewById(R.id.bottom_navigation);
         searchButton = findViewById(R.id.main_search_btn);
-        addNewChatBtn = findViewById(R.id.main_add_new_chat_btn); // Referência para o novo botão
+        addNewChatBtn = findViewById(R.id.main_add_new_chat_btn);
 
-        // Ação de clique para o botão de busca (lupa)
         searchButton.setOnClickListener((v)->{
             startActivity(new Intent(MainActivity.this,SearchUserActivity.class));
         });
 
-        // Ação de clique para o novo botão "+"
+        // AÇÃO DO BOTÃO + MODIFICADA
         addNewChatBtn.setOnClickListener((v) -> {
-            startActivity(new Intent(MainActivity.this, SearchUserActivity.class));
+            // Em vez de ir para a busca, agora vai para a seleção de membros do grupo
+            startActivity(new Intent(MainActivity.this, SelectGroupMembersActivity.class));
         });
 
         bottomNavigationView.setOnItemSelectedListener(new NavigationBarView.OnItemSelectedListener() {
@@ -71,7 +71,6 @@ public class MainActivity extends AppCompatActivity {
             if(task.isSuccessful()){
                 String token = task.getResult();
                 FirebaseUtil.currentUserDetails().update("fcmToken",token);
-
             }
         });
     }

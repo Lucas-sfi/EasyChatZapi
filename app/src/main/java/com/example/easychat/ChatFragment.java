@@ -67,9 +67,6 @@ public class ChatFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        // ESTA LINHA É A CORREÇÃO CRUCIAL
-        // Ela força a lista a se redesenhar com os dados mais recentes
-        // sempre que o usuário voltar para esta tela.
         if(adapter!=null)
             adapter.notifyDataSetChanged();
     }

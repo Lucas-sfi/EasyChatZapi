@@ -5,12 +5,17 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.util.Log;
+import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.example.easychat.adapter.ChatRecyclerAdapter;
 import com.example.easychat.model.ChatMessageModel;
@@ -30,6 +35,7 @@ import org.json.JSONObject;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.List;
 
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -41,92 +47,105 @@ import okhttp3.Response;
 
 public class ChatActivity extends AppCompatActivity {
 
-    UserModel otherUser;
     String chatroomId;
     ChatroomModel chatroomModel;
-    ChatRecyclerAdapter adapter;
+    UserModel otherUser; // Apenas para chats individuais
 
+    ChatRecyclerAdapter adapter;
     EditText messageInput;
     ImageButton sendMessageBtn;
     ImageButton backBtn;
-    TextView otherUsername;
+    TextView toolbarTitle;
     RecyclerView recyclerView;
-    ImageView imageView;
-
+    ImageView toolbarProfilePic;
+    RelativeLayout toolbar;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_chat);
 
-        otherUser = AndroidUtil.getUserModelFromIntent(getIntent());
-        chatroomId = FirebaseUtil.getChatroomId(FirebaseUtil.currentUserId(),otherUser.getUserId());
-
+        // Inicializar Views
         messageInput = findViewById(R.id.chat_message_input);
         sendMessageBtn = findViewById(R.id.message_send_btn);
         backBtn = findViewById(R.id.back_btn);
-        otherUsername = findViewById(R.id.other_username);
+        toolbarTitle = findViewById(R.id.other_username);
         recyclerView = findViewById(R.id.chat_recycler_view);
-        imageView = findViewById(R.id.profile_pic_image_view);
+        toolbarProfilePic = findViewById(R.id.profile_pic_image_view);
+        toolbar = findViewById(R.id.toolbar);
 
-        FirebaseUtil.getOtherProfilePicStorageRef(otherUser.getUserId()).getDownloadUrl()
-                .addOnCompleteListener(t -> {
-                    if(t.isSuccessful()){
-                        Uri uri  = t.getResult();
-                        AndroidUtil.setProfilePic(this,uri,imageView);
-                    }
-                });
+        backBtn.setOnClickListener(v -> onBackPressed());
 
-        backBtn.setOnClickListener((v)->{
-            onBackPressed();
-        });
-        otherUsername.setText(otherUser.getUsername());
+        // Obter o ID da sala de chat do Intent
+        chatroomId = getIntent().getStringExtra("chatroomId");
+        // Obter o UserModel (pode ser nulo se for um grupo)
+        otherUser = AndroidUtil.getUserModelFromIntent(getIntent());
 
-        sendMessageBtn.setOnClickListener((v -> {
+        // Buscar dados da sala de chat e configurar a UI
+        getChatroomData();
+
+        sendMessageBtn.setOnClickListener(v -> {
             String message = messageInput.getText().toString().trim();
-            if(message.isEmpty())
-                return;
-            sendMessageToUser(message);
-        }));
-
-        getOrCreateChatroomModel();
-        setupChatRecyclerView();
+            if (message.isEmpty()) return;
+            sendMessage(message);
+        });
     }
 
-    @Override
-    protected void onStart() {
-        super.onStart();
-        if(adapter != null) {
-            adapter.startListening();
+    private void getChatroomData() {
+        FirebaseUtil.getChatroomReference(chatroomId).get().addOnCompleteListener(task -> {
+            if (task.isSuccessful()) {
+                chatroomModel = task.getResult().toObject(ChatroomModel.class);
+                if (chatroomModel == null) {
+                    Toast.makeText(this, "Chatroom not found", Toast.LENGTH_SHORT).show();
+                    finish();
+                    return;
+                }
+                updateUI();
+                setupChatRecyclerView();
+            } else {
+                Toast.makeText(this, "Failed to load chatroom", Toast.LENGTH_SHORT).show();
+                finish();
+            }
+        });
+    }
+
+    private void updateUI() {
+        if (chatroomModel.isGroupChat()) {
+            // Configurar UI para Grupo
+            toolbarTitle.setText(chatroomModel.getGroupName());
+            toolbarProfilePic.setImageResource(R.drawable.chat_icon);
+            toolbar.setOnClickListener(v -> {
+                // ABRIR CONFIGURAÇÕES DO GRUPO (PRÓXIMO PASSO)
+                Toast.makeText(this, "Group settings coming soon!", Toast.LENGTH_SHORT).show();
+            });
+        } else {
+            // Configurar UI para Chat Individual
+            if (otherUser != null) {
+                toolbarTitle.setText(otherUser.getUsername());
+                FirebaseUtil.getOtherProfilePicStorageRef(otherUser.getUserId()).getDownloadUrl()
+                        .addOnCompleteListener(t -> {
+                            if (t.isSuccessful()) {
+                                Uri uri = t.getResult();
+                                AndroidUtil.setProfilePic(this, uri, toolbarProfilePic);
+                            }
+                        });
+            }
         }
     }
 
-    @Override
-    protected void onStop() {
-        super.onStop();
-        if(adapter != null) {
-            adapter.stopListening();
-        }
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        markMessagesAsRead();
-    }
-
-    void setupChatRecyclerView(){
+    private void setupChatRecyclerView() {
         Query query = FirebaseUtil.getChatroomMessageReference(chatroomId)
                 .orderBy("timestamp", Query.Direction.DESCENDING);
 
         FirestoreRecyclerOptions<ChatMessageModel> options = new FirestoreRecyclerOptions.Builder<ChatMessageModel>()
-                .setQuery(query,ChatMessageModel.class).build();
+                .setQuery(query, ChatMessageModel.class).build();
 
-        adapter = new ChatRecyclerAdapter(options,getApplicationContext());
+        adapter = new ChatRecyclerAdapter(options, getApplicationContext());
         LinearLayoutManager manager = new LinearLayoutManager(this);
         manager.setReverseLayout(true);
         recyclerView.setLayoutManager(manager);
         recyclerView.setAdapter(adapter);
+        adapter.startListening();
 
         adapter.registerAdapterDataObserver(new RecyclerView.AdapterDataObserver() {
             @Override
@@ -137,95 +156,67 @@ public class ChatActivity extends AppCompatActivity {
         });
     }
 
-    void sendMessageToUser(String message){
+    private void sendMessage(String message) {
+        if (chatroomModel == null) return;
 
         chatroomModel.setLastMessageTimestamp(Timestamp.now());
         chatroomModel.setLastMessageSenderId(FirebaseUtil.currentUserId());
         chatroomModel.setLastMessage(message);
         FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel);
 
-        ChatMessageModel chatMessageModel = new ChatMessageModel(message,FirebaseUtil.currentUserId(),Timestamp.now(), ChatMessageModel.STATUS_SENT);
+        ChatMessageModel chatMessageModel = new ChatMessageModel(message, FirebaseUtil.currentUserId(), Timestamp.now(), ChatMessageModel.STATUS_SENT);
         FirebaseUtil.getChatroomMessageReference(chatroomId).add(chatMessageModel)
-                .addOnCompleteListener(new OnCompleteListener<DocumentReference>() {
-                    @Override
-                    public void onComplete(@NonNull Task<DocumentReference> task) {
-                        if(task.isSuccessful()){
-                            messageInput.setText("");
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        messageInput.setText("");
+                        // Lógica de notificação pode ser ajustada para grupos depois
+                        if (!chatroomModel.isGroupChat() && otherUser != null) {
                             sendNotification(message);
                         }
                     }
                 });
     }
 
-    void getOrCreateChatroomModel(){
-        FirebaseUtil.getChatroomReference(chatroomId).get().addOnCompleteListener(task -> {
-            if(task.isSuccessful()){
-                chatroomModel = task.getResult().toObject(ChatroomModel.class);
-                if(chatroomModel==null){
-                    chatroomModel = new ChatroomModel(
-                            chatroomId,
-                            Arrays.asList(FirebaseUtil.currentUserId(),otherUser.getUserId()),
-                            Timestamp.now(),
-                            ""
-                    );
-                    FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel);
-                }
-            }
-        });
-    }
+    void sendNotification(String message) {
+        if (otherUser == null || otherUser.getFcmToken() == null) return;
 
-    void markMessagesAsRead() {
-        FirebaseUtil.getChatroomMessageReference(chatroomId)
-                .whereEqualTo("senderId", otherUser.getUserId())
-                .whereNotEqualTo("status", ChatMessageModel.STATUS_READ)
-                .get()
-                .addOnCompleteListener(task -> {
-                    if (task.isSuccessful() && task.getResult() != null) {
-                        for (DocumentSnapshot document : task.getResult().getDocuments()) {
-                            document.getReference().update("status", ChatMessageModel.STATUS_READ);
-                        }
-                    }
-                });
-    }
-
-    void sendNotification(String message){
         FirebaseUtil.currentUserDetails().get().addOnCompleteListener(task -> {
-            if(task.isSuccessful()){
+            if (task.isSuccessful()) {
                 UserModel currentUser = task.getResult().toObject(UserModel.class);
-                try{
-                    JSONObject jsonObject  = new JSONObject();
+                if (currentUser == null) return;
+                try {
+                    JSONObject jsonObject = new JSONObject();
                     JSONObject notificationObj = new JSONObject();
-                    notificationObj.put("title",currentUser.getUsername());
-                    notificationObj.put("body",message);
+                    notificationObj.put("title", currentUser.getUsername());
+                    notificationObj.put("body", message);
                     JSONObject dataObj = new JSONObject();
-                    dataObj.put("userId",currentUser.getUserId());
-                    jsonObject.put("notification",notificationObj);
-                    jsonObject.put("data",dataObj);
-                    jsonObject.put("to",otherUser.getFcmToken());
+                    dataObj.put("userId", currentUser.getUserId());
+                    jsonObject.put("notification", notificationObj);
+                    jsonObject.put("data", dataObj);
+                    jsonObject.put("to", otherUser.getFcmToken());
                     callApi(jsonObject);
-                }catch (Exception e){
+                } catch (Exception e) {
+                    Log.e("ChatActivity", "sendNotification failed", e);
                 }
             }
         });
     }
 
-    void callApi(JSONObject jsonObject){
+    void callApi(JSONObject jsonObject) {
         MediaType JSON = MediaType.get("application/json; charset=utf-8");
         OkHttpClient client = new OkHttpClient();
         String url = "https://fcm.googleapis.com/fcm/send";
-        RequestBody body = RequestBody.create(jsonObject.toString(),JSON);
+        RequestBody body = RequestBody.create(jsonObject.toString(), JSON);
         Request request = new Request.Builder()
                 .url(url)
                 .post(body)
-                .header("Authorization","Bearer YOUR_API_KEY")
+                .header("Authorization", "Bearer YOUR_API_KEY")
                 .build();
         client.newCall(request).enqueue(new Callback() {
             @Override
-            public void onFailure(@NonNull Call call, @NonNull IOException e) {
-            }
+            public void onFailure(@NonNull Call call, @NonNull IOException e) {}
             @Override
-            public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
-            }
+            public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {}
         });
     }
 }
