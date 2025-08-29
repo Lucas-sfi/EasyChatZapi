@@ -9,6 +9,8 @@ import android.util.Log;
 import android.view.MenuItem;
 import android.widget.ImageButton;
 
+import com.example.easychat.model.ChatMessageModel;
+import com.example.easychat.model.ChatroomModel;
 import com.example.easychat.model.UserModel;
 import com.example.easychat.utils.FirebaseUtil;
 import com.google.android.gms.tasks.OnCompleteListener;
@@ -20,10 +22,14 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
 import com.google.firebase.messaging.FirebaseMessaging;
 
+import java.util.Arrays;
+import java.util.List;
+
 public class MainActivity extends AppCompatActivity {
 
     BottomNavigationView bottomNavigationView;
-    ImageButton searchButton;
+    ImageButton addUserBtn;
+    ImageButton searchMessageBtn;
     FloatingActionButton addNewChatBtn;
 
     ChatFragment chatFragment;
@@ -38,11 +44,16 @@ public class MainActivity extends AppCompatActivity {
         profileFragment = new ProfileFragment();
 
         bottomNavigationView = findViewById(R.id.bottom_navigation);
-        searchButton = findViewById(R.id.main_search_btn);
+        addUserBtn = findViewById(R.id.main_add_user_btn);
+        searchMessageBtn = findViewById(R.id.main_search_message_btn);
         addNewChatBtn = findViewById(R.id.main_add_new_chat_btn);
 
-        searchButton.setOnClickListener((v)->{
-            startActivity(new Intent(MainActivity.this,SearchUserActivity.class));
+        addUserBtn.setOnClickListener((v)->{
+            startActivity(new Intent(MainActivity.this, SearchUserActivity.class));
+        });
+
+        searchMessageBtn.setOnClickListener(v -> {
+            startActivity(new Intent(MainActivity.this, SearchMessageActivity.class));
         });
 
         addNewChatBtn.setOnClickListener((v) -> {
@@ -65,32 +76,38 @@ public class MainActivity extends AppCompatActivity {
 
         getFCMToken();
 
-        // CHAME A FUNÇÃO DE MIGRAÇÃO AQUI
-        migrateUserData();
+        // CHAME A NOVA FUNÇÃO DE MIGRAÇÃO AQUI
+        migrateMessagesData();
     }
 
-    // FUNÇÃO DE MIGRAÇÃO TEMPORÁRIA
-    void migrateUserData() {
-        FirebaseUtil.allUserCollectionReference().get().addOnCompleteListener(task -> {
-            if (task.isSuccessful()) {
-                for (DocumentSnapshot document : task.getResult()) {
-                    UserModel user = document.toObject(UserModel.class);
-                    // Verifica se o campo de pesquisa está em falta ou nulo
-                    if (user != null && user.getSearchUsername() == null) {
-                        String username = user.getUsername();
-                        if (username != null) {
-                            document.getReference().update("searchUsername", username.toLowerCase())
-                                    .addOnSuccessListener(aVoid -> Log.d("Migration", "User updated: " + user.getUserId()))
-                                    .addOnFailureListener(e -> Log.e("Migration", "Error updating user: " + user.getUserId(), e));
-                        }
+    // FUNÇÃO DE MIGRAÇÃO TEMPORÁRIA PARA MENSAGENS
+    void migrateMessagesData() {
+        FirebaseUtil.allChatroomCollectionReference()
+                .whereArrayContains("userIds", FirebaseUtil.currentUserId())
+                .get()
+                .addOnSuccessListener(chatroomSnapshots -> {
+                    for (ChatroomModel chatroom : chatroomSnapshots.toObjects(ChatroomModel.class)) {
+                        FirebaseUtil.getChatroomMessageReference(chatroom.getChatroomId()).get()
+                                .addOnSuccessListener(messageSnapshots -> {
+                                    for (DocumentSnapshot messageDoc : messageSnapshots.getDocuments()) {
+                                        ChatMessageModel message = messageDoc.toObject(ChatMessageModel.class);
+                                        if (message != null && message.getSearchKeywords() == null) {
+                                            String messageText = message.getMessage();
+                                            if (messageText != null && !messageText.isEmpty()) {
+                                                String searchableString = messageText.toLowerCase().replaceAll("[^a-zA-Z0-9\\s]", "");
+                                                List<String> keywords = Arrays.asList(searchableString.split("\\s+"));
+                                                messageDoc.getReference().update("searchKeywords", keywords)
+                                                        .addOnSuccessListener(aVoid -> Log.d("MsgMigration", "Message updated: " + messageDoc.getId()))
+                                                        .addOnFailureListener(e -> Log.e("MsgMigration", "Error updating message: " + messageDoc.getId(), e));
+                                            }
+                                        }
+                                    }
+                                });
                     }
-                }
-                Log.d("Migration", "Data migration check completed.");
-            } else {
-                Log.e("Migration", "Error getting documents: ", task.getException());
-            }
-        });
+                    Log.d("MsgMigration", "Message migration check completed.");
+                });
     }
+
 
     void getFCMToken(){
         FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {

@@ -24,7 +24,7 @@
             android:layout_centerVertical="true"/>
 
         <ImageButton
-            android:id="@+id/main_search_btn"
+            android:id="@+id/main_add_user_btn"
             android:layout_width="32dp"
             android:layout_height="32dp"
             android:src="@drawable/icon_person_add"
@@ -33,6 +33,17 @@
             app:tint="@color/white"
             android:layout_centerVertical="true"
             android:layout_marginEnd="10dp"/>
+
+        <ImageButton
+            android:id="@+id/main_search_message_btn"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/icon_search"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            app:tint="@color/white"
+            android:layout_centerVertical="true"
+            android:layout_toStartOf="@id/main_add_user_btn"
+            android:layout_marginEnd="15dp"/>
 
     </RelativeLayout>
 

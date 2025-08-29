@@ -8,6 +8,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
 import android.util.Log;
 import android.view.View;
 import android.widget.EditText;
@@ -60,6 +61,8 @@ public class ChatActivity extends AppCompatActivity {
     ImageView toolbarProfilePic;
     RelativeLayout toolbar;
 
+    private long targetMessageTimestamp = -1;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -77,6 +80,7 @@ public class ChatActivity extends AppCompatActivity {
 
         otherUser = AndroidUtil.getUserModelFromIntent(getIntent());
         chatroomId = getIntent().getStringExtra("chatroomId");
+        targetMessageTimestamp = getIntent().getLongExtra("messageTimestamp", -1);
 
         if (chatroomId == null && otherUser != null) {
             chatroomId = FirebaseUtil.getChatroomId(FirebaseUtil.currentUserId(), otherUser.getUserId());
@@ -117,19 +121,35 @@ public class ChatActivity extends AppCompatActivity {
         FirebaseUtil.getChatroomReference(chatroomId).get().addOnCompleteListener(task -> {
             if (task.isSuccessful()) {
                 chatroomModel = task.getResult().toObject(ChatroomModel.class);
-                if (chatroomModel == null && !FirebaseUtil.isGroupChat(chatroomId)) {
-                    chatroomModel = new ChatroomModel(
-                            chatroomId,
-                            Arrays.asList(FirebaseUtil.currentUserId(), otherUser.getUserId()),
-                            Timestamp.now(),
-                            "",
-                            "",
-                            false
-                    );
-                    FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel);
+                if (chatroomModel == null) {
+                    // Se a conversa não existir (caso de 1-para-1), cria-a
+                    if (!FirebaseUtil.isGroupChat(chatroomId)) {
+                        chatroomModel = new ChatroomModel(
+                                chatroomId,
+                                Arrays.asList(FirebaseUtil.currentUserId(), otherUser.getUserId()),
+                                Timestamp.now(), "", "", false
+                        );
+                        FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel);
+                    } else {
+                        Toast.makeText(this, "Chatroom not found", Toast.LENGTH_SHORT).show();
+                        finish();
+                        return;
+                    }
                 }
-                updateUI();
-                setupChatRecyclerView();
+
+                // LÓGICA CORRIGIDA: Se for um chat individual, carregar o 'otherUser'
+                if (!chatroomModel.isGroupChat()) {
+                    FirebaseUtil.getOtherUserFromChatroom(chatroomModel.getUserIds()).get()
+                            .addOnSuccessListener(documentSnapshot -> {
+                                otherUser = documentSnapshot.toObject(UserModel.class);
+                                updateUI();
+                                setupChatRecyclerView();
+                            });
+                } else {
+                    updateUI();
+                    setupChatRecyclerView();
+                }
+
             } else {
                 Toast.makeText(this, "Failed to load chatroom", Toast.LENGTH_SHORT).show();
                 finish();
@@ -169,22 +189,45 @@ public class ChatActivity extends AppCompatActivity {
 
     private void setupChatRecyclerView() {
         Query query = FirebaseUtil.getChatroomMessageReference(chatroomId)
-                .orderBy("timestamp", Query.Direction.DESCENDING);
+                .orderBy("timestamp", Query.Direction.ASCENDING);
+
         FirestoreRecyclerOptions<ChatMessageModel> options = new FirestoreRecyclerOptions.Builder<ChatMessageModel>()
                 .setQuery(query, ChatMessageModel.class).build();
+
         adapter = new ChatRecyclerAdapter(options, getApplicationContext());
         LinearLayoutManager manager = new LinearLayoutManager(this);
-        manager.setReverseLayout(true);
         recyclerView.setLayoutManager(manager);
         recyclerView.setAdapter(adapter);
         adapter.startListening();
+
         adapter.registerAdapterDataObserver(new RecyclerView.AdapterDataObserver() {
             @Override
             public void onItemRangeInserted(int positionStart, int itemCount) {
                 super.onItemRangeInserted(positionStart, itemCount);
-                recyclerView.smoothScrollToPosition(0);
+                if (targetMessageTimestamp == -1) {
+                    recyclerView.smoothScrollToPosition(adapter.getItemCount() - 1);
+                }
             }
         });
+
+        if (targetMessageTimestamp != -1) {
+            query.get().addOnSuccessListener(queryDocumentSnapshots -> {
+                List<ChatMessageModel> messages = queryDocumentSnapshots.toObjects(ChatMessageModel.class);
+                for (int i = 0; i < messages.size(); i++) {
+                    if (messages.get(i).getTimestamp().toDate().getTime() == targetMessageTimestamp) {
+                        final int position = i;
+                        new Handler().postDelayed(() -> recyclerView.smoothScrollToPosition(position), 200);
+                        break;
+                    }
+                }
+            });
+        } else {
+            new Handler().postDelayed(() -> {
+                if(adapter.getItemCount() > 0){
+                    recyclerView.smoothScrollToPosition(adapter.getItemCount() - 1);
+                }
+            }, 200);
+        }
     }
 
     private void sendMessage(String message) {
@@ -194,8 +237,8 @@ public class ChatActivity extends AppCompatActivity {
         chatroomModel.setLastMessage(message);
         FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel);
 
-        // LÓGICA DE CRIAÇÃO DE PALAVRAS-CHAVE
-        List<String> keywords = Arrays.asList(message.toLowerCase().split(" "));
+        String searchableString = message.toLowerCase().replaceAll("[^a-zA-Z0-9\\s]", "");
+        List<String> keywords = Arrays.asList(searchableString.split("\\s+"));
         ChatMessageModel chatMessageModel = new ChatMessageModel(message, FirebaseUtil.currentUserId(), Timestamp.now(), ChatMessageModel.STATUS_SENT, keywords);
 
         FirebaseUtil.getChatroomMessageReference(chatroomId).add(chatMessageModel)

@@ -20,6 +20,14 @@
             android:resource="@color/my_primary"/>
 
         <activity
+            android:name=".SearchMessageActivity"
+            android:exported="false">
+            <meta-data
+                android:name="android.app.lib_name"
+                android:value="" />
+        </activity>
+
+        <activity
             android:name=".UserSettingsActivity"
             android:exported="false">
             <meta-data
