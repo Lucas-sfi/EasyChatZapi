@@ -71,7 +71,6 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
     ImageView toolbarProfilePic;
     RelativeLayout toolbar;
 
-    // Elementos da pesquisa
     ImageButton chatSearchButton;
     RelativeLayout inChatSearchBar;
     EditText inChatSearchInput;
@@ -79,12 +78,10 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
     private List<Integer> searchResultPositions = new ArrayList<>();
     private int currentSearchIndex = -1;
 
-    // Elementos da mensagem fixada
     RelativeLayout pinnedMessageLayout;
     TextView pinnedMessageText;
     ImageButton unpinButton;
 
-    // Elementos do envio de imagem
     ImageButton attachFileButton;
     ActivityResultLauncher<Intent> imagePickerLauncher;
     Uri selectedImageUri;
@@ -126,7 +123,6 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
                 }
         );
 
-        // Obtenção de dados do Intent
         otherUser = AndroidUtil.getUserModelFromIntent(getIntent());
         chatroomId = getIntent().getStringExtra("chatroomId");
         targetMessageTimestamp = getIntent().getLongExtra("messageTimestamp", -1);
@@ -182,24 +178,38 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
     private void getChatroomData() {
         FirebaseUtil.getChatroomReference(chatroomId).addSnapshotListener((snapshot, e) -> {
             if (e != null) { return; }
-            if (snapshot != null && snapshot.exists()) {
-                chatroomModel = snapshot.toObject(ChatroomModel.class);
-                if (chatroomModel == null) {
+
+            // Lógica CORRIGIDA para recriar a conversa
+            if (snapshot == null || !snapshot.exists()) {
+                if (!FirebaseUtil.isGroupChat(chatroomId) && otherUser != null) {
+                    chatroomModel = new ChatroomModel(
+                            chatroomId,
+                            Arrays.asList(FirebaseUtil.currentUserId(), otherUser.getUserId()),
+                            Timestamp.now(), "", "", false
+                    );
+                    FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel);
+                } else {
+                    // Se for um grupo que não existe, ou se não houver otherUser, não podemos continuar
+                    Toast.makeText(this, "Chat not found", Toast.LENGTH_SHORT).show();
                     finish();
                     return;
                 }
+            } else {
+                chatroomModel = snapshot.toObject(ChatroomModel.class);
+            }
 
-                if (!chatroomModel.isGroupChat() && otherUser == null) {
-                    FirebaseUtil.getOtherUserFromChatroom(chatroomModel.getUserIds()).get()
-                            .addOnSuccessListener(documentSnapshot -> {
-                                otherUser = documentSnapshot.toObject(UserModel.class);
-                                updateUI();
-                                setupChatRecyclerView();
-                            });
-                } else {
-                    updateUI();
-                    setupChatRecyclerView();
-                }
+            if (chatroomModel == null) { return; }
+
+            if (!chatroomModel.isGroupChat() && otherUser == null) {
+                FirebaseUtil.getOtherUserFromChatroom(chatroomModel.getUserIds()).get()
+                        .addOnSuccessListener(documentSnapshot -> {
+                            otherUser = documentSnapshot.toObject(UserModel.class);
+                            updateUI();
+                            setupChatRecyclerView();
+                        });
+            } else {
+                updateUI();
+                setupChatRecyclerView();
             }
         });
     }
@@ -277,7 +287,7 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
             });
 
             if (targetMessageTimestamp != -1) {
-                // ... (código existente)
+                // ... (código existente para deslizar)
             } else {
                 new Handler().postDelayed(() -> {
                     if(adapter.getItemCount() > 0){
@@ -286,28 +296,6 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
                 }, 200);
             }
         }
-    }
-
-    private void sendMessage(String message) {
-        if (chatroomModel == null) return;
-        chatroomModel.setLastMessageTimestamp(Timestamp.now());
-        chatroomModel.setLastMessageSenderId(FirebaseUtil.currentUserId());
-        chatroomModel.setLastMessage(message);
-        FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel);
-
-        List<String> keywords = generateKeywords(message);
-        // AQUI ESTÁ A CORREÇÃO: Adicionar o tipo "text"
-        ChatMessageModel chatMessageModel = new ChatMessageModel(message, FirebaseUtil.currentUserId(), Timestamp.now(), ChatMessageModel.STATUS_SENT, keywords, "text");
-
-        FirebaseUtil.getChatroomMessageReference(chatroomId).add(chatMessageModel)
-                .addOnCompleteListener(task -> {
-                    if (task.isSuccessful()) {
-                        messageInput.setText("");
-                        if (!chatroomModel.isGroupChat() && otherUser != null) {
-                            sendNotification(message);
-                        }
-                    }
-                });
     }
 
     void uploadImageToFirebase() {
@@ -338,7 +326,7 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
         FirebaseUtil.getChatroomMessageReference(chatroomId).add(chatMessageModel);
     }
 
-    // ... (restantes métodos: toggleSearchBar, searchInChat, onResume, etc. continuam iguais)
+    // ... (restantes métodos continuam iguais)
 
     private void toggleSearchBar() {
         if (inChatSearchBar.getVisibility() == View.VISIBLE) {
@@ -346,6 +334,28 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
             clearSearch();
         } else {
             inChatSearchBar.setVisibility(View.VISIBLE);
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        markMessagesAsRead();
+    }
+
+    private void markMessagesAsRead() {
+        if (chatroomModel != null && !chatroomModel.isGroupChat() && otherUser != null) {
+            FirebaseUtil.getChatroomMessageReference(chatroomId)
+                    .whereEqualTo("senderId", otherUser.getUserId())
+                    .whereEqualTo("status", ChatMessageModel.STATUS_SENT)
+                    .get()
+                    .addOnCompleteListener(task -> {
+                        if (task.isSuccessful() && task.getResult() != null) {
+                            for (DocumentSnapshot document : task.getResult().getDocuments()) {
+                                document.getReference().update("status", ChatMessageModel.STATUS_READ);
+                            }
+                        }
+                    });
         }
     }
 
@@ -416,6 +426,27 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
             }
         }
         return keywords;
+    }
+
+    private void sendMessage(String message) {
+        if (chatroomModel == null) return;
+        chatroomModel.setLastMessageTimestamp(Timestamp.now());
+        chatroomModel.setLastMessageSenderId(FirebaseUtil.currentUserId());
+        chatroomModel.setLastMessage(message);
+        FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel);
+
+        List<String> keywords = generateKeywords(message);
+        ChatMessageModel chatMessageModel = new ChatMessageModel(message, FirebaseUtil.currentUserId(), Timestamp.now(), ChatMessageModel.STATUS_SENT, keywords, "text");
+
+        FirebaseUtil.getChatroomMessageReference(chatroomId).add(chatMessageModel)
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        messageInput.setText("");
+                        if (!chatroomModel.isGroupChat() && otherUser != null) {
+                            sendNotification(message);
+                        }
+                    }
+                });
     }
 
     void sendNotification(String message) {

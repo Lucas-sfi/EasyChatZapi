@@ -16,7 +16,7 @@
         android:backgroundTint="@color/my_primary"
         android:src="@drawable/person_icon"
         android:scaleType="centerCrop"
-        android:layout_marginBottom="40dp"/>
+        android:layout_marginBottom="20dp"/>
 
     <com.google.android.material.switchmaterial.SwitchMaterial
         android:id="@+id/busy_switch"
@@ -24,7 +24,7 @@
         android:layout_height="wrap_content"
         android:text="Set as Busy"
         android:textSize="18sp"
-        android:layout_marginBottom="20dp"/>
+        android:layout_marginBottom="10dp"/>
 
     <EditText
         android:id="@+id/profile_username"
@@ -36,6 +36,29 @@
         android:layout_margin="10dp"
         android:background="@drawable/edit_text_rounded_corner"
         android:elevation="5dp"/>
+
+    <EditText
+        android:id="@+id/profile_age"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="10dp"
+        android:hint="Age"
+        android:inputType="number"
+        android:layout_margin="10dp"
+        android:background="@drawable/edit_text_rounded_corner"
+        android:elevation="5dp"/>
+
+    <EditText
+        android:id="@+id/profile_city"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="10dp"
+        android:hint="City"
+        android:inputType="text"
+        android:layout_margin="10dp"
+        android:background="@drawable/edit_text_rounded_corner"
+        android:elevation="5dp"/>
+
     <EditText
         android:id="@+id/profile_phone"
         android:layout_width="match_parent"
@@ -50,9 +73,9 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="100dp"
+        android:layout_height="wrap_content"
         android:gravity="center_vertical"
-        android:layout_marginTop="20dp"
+        android:layout_marginTop="10dp"
         android:orientation="vertical">
         <Button
             android:id="@+id/profle_update_btn"

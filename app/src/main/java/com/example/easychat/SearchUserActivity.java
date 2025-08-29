@@ -47,40 +47,42 @@ public class SearchUserActivity extends AppCompatActivity {
                 searchInput.setError("Invalid Username");
                 return;
             }
-            getContactIdsAndSetupRecyclerView(searchTerm.toLowerCase());
+            setupSearchRecyclerView(searchTerm.toLowerCase());
         });
     }
 
-    void getContactIdsAndSetupRecyclerView(String searchTerm) {
+    void setupSearchRecyclerView(String searchTerm){
+        // Lógica CORRIGIDA: Buscar a lista de contactos primeiro
         FirebaseUtil.allChatroomCollectionReference()
                 .whereArrayContains("userIds", FirebaseUtil.currentUserId())
-                .get()
-                .addOnSuccessListener(queryDocumentSnapshots -> {
-                    List<String> contactIds = new ArrayList<>();
-                    for (ChatroomModel chatroom : queryDocumentSnapshots.toObjects(ChatroomModel.class)) {
-                        for (String userId : chatroom.getUserIds()) {
-                            if (!userId.equals(FirebaseUtil.currentUserId())) {
-                                contactIds.add(userId);
+                .get().addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        List<String> contactIds = new ArrayList<>();
+                        for (ChatroomModel chatroom : task.getResult().toObjects(ChatroomModel.class)) {
+                            // Apenas adicionar contactos de conversas individuais, não de grupos
+                            if (!chatroom.isGroupChat()) {
+                                for (String userId : chatroom.getUserIds()) {
+                                    if (!userId.equals(FirebaseUtil.currentUserId())) {
+                                        contactIds.add(userId);
+                                    }
+                                }
                             }
                         }
+
+                        // Agora, configurar a query da pesquisa
+                        Query query = FirebaseUtil.allUserCollectionReference()
+                                .whereGreaterThanOrEqualTo("searchUsername", searchTerm)
+                                .whereLessThanOrEqualTo("searchUsername", searchTerm + '\uf8ff');
+
+                        FirestoreRecyclerOptions<UserModel> options = new FirestoreRecyclerOptions.Builder<UserModel>()
+                                .setQuery(query, UserModel.class).build();
+
+                        adapter = new SearchUserRecyclerAdapter(options, getApplicationContext(), contactIds);
+                        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+                        recyclerView.setAdapter(adapter);
+                        adapter.startListening();
                     }
-                    setupSearchRecyclerView(searchTerm, contactIds);
                 });
-    }
-
-    void setupSearchRecyclerView(String searchTerm, List<String> contactIds){
-        // QUERY CORRIGIDA para usar o novo campo
-        Query query = FirebaseUtil.allUserCollectionReference()
-                .whereGreaterThanOrEqualTo("searchUsername", searchTerm)
-                .whereLessThanOrEqualTo("searchUsername", searchTerm + '\uf8ff');
-
-        FirestoreRecyclerOptions<UserModel> options = new FirestoreRecyclerOptions.Builder<UserModel>()
-                .setQuery(query, UserModel.class).build();
-
-        adapter = new SearchUserRecyclerAdapter(options, getApplicationContext(), contactIds);
-        recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        recyclerView.setAdapter(adapter);
-        adapter.startListening();
     }
 
     @Override

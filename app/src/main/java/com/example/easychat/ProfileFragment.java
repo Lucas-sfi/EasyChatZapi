@@ -33,6 +33,8 @@ public class ProfileFragment extends Fragment {
     ImageView profilePic;
     EditText usernameInput;
     EditText phoneInput;
+    EditText ageInput; // Novo campo
+    EditText cityInput; // Novo campo
     Button updateProfileBtn;
     ProgressBar progressBar;
     TextView logoutBtn;
@@ -66,6 +68,8 @@ public class ProfileFragment extends Fragment {
         profilePic = view.findViewById(R.id.profile_image_view);
         usernameInput = view.findViewById(R.id.profile_username);
         phoneInput = view.findViewById(R.id.profile_phone);
+        ageInput = view.findViewById(R.id.profile_age); // Referência
+        cityInput = view.findViewById(R.id.profile_city); // Referência
         updateProfileBtn = view.findViewById(R.id.profle_update_btn);
         progressBar = view.findViewById(R.id.profile_progress_bar);
         logoutBtn = view.findViewById(R.id.logout_btn);
@@ -99,12 +103,23 @@ public class ProfileFragment extends Fragment {
 
     void updateBtnClick(){
         String newUsername = usernameInput.getText().toString();
+        String newAgeStr = ageInput.getText().toString();
+        String newCity = cityInput.getText().toString();
+
         if(newUsername.isEmpty() || newUsername.length()<3){
             usernameInput.setError("Username length should be at least 3 chars");
             return;
         }
+
         currentUserModel.setUsername(newUsername);
-        currentUserModel.setSearchUsername(newUsername.toLowerCase()); // Atualizar o campo de pesquisa
+        currentUserModel.setSearchUsername(newUsername.toLowerCase());
+        currentUserModel.setCity(newCity);
+        if (!newAgeStr.isEmpty()) {
+            currentUserModel.setAge(Integer.parseInt(newAgeStr));
+        } else {
+            currentUserModel.setAge(0); // Valor padrão se o campo estiver vazio
+        }
+
         setInProgress(true);
 
         if(selectedImageUri!=null){
@@ -143,6 +158,11 @@ public class ProfileFragment extends Fragment {
             if(currentUserModel != null){
                 usernameInput.setText(currentUserModel.getUsername());
                 phoneInput.setText(currentUserModel.getPhone());
+                cityInput.setText(currentUserModel.getCity());
+                if (currentUserModel.getAge() > 0) {
+                    ageInput.setText(String.valueOf(currentUserModel.getAge()));
+                }
+
                 busySwitch.setChecked("busy".equals(currentUserModel.getUserStatus()));
                 busySwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
                     if (isChecked) {
