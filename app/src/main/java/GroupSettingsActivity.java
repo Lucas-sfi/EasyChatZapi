@@ -4,7 +4,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import android.content.DialogInterface;
+
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.InputType;
@@ -13,10 +13,13 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import com.example.easychat.adapter.GroupMemberRecyclerAdapter;
 import com.example.easychat.model.ChatroomModel;
 import com.example.easychat.utils.FirebaseUtil;
+
 import java.util.ArrayList;
+import java.util.List;
 
 public class GroupSettingsActivity extends AppCompatActivity {
 
@@ -27,6 +30,7 @@ public class GroupSettingsActivity extends AppCompatActivity {
     private RecyclerView membersRecyclerView;
     private GroupMemberRecyclerAdapter adapter;
     private Button addMemberBtn;
+    private Button leaveGroupBtn; // Novo botão
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -37,30 +41,29 @@ public class GroupSettingsActivity extends AppCompatActivity {
         groupNameView = findViewById(R.id.group_name_view);
         membersRecyclerView = findViewById(R.id.members_recycler_view);
         addMemberBtn = findViewById(R.id.add_member_btn);
+        leaveGroupBtn = findViewById(R.id.leave_group_btn); // Referência do novo botão
 
         chatroomId = getIntent().getStringExtra("chatroomId");
 
         backButton.setOnClickListener(v -> onBackPressed());
-
         groupNameView.setOnClickListener(v -> showRenameGroupDialog());
 
         addMemberBtn.setOnClickListener(v -> {
             Intent intent = new Intent(this, SelectGroupMembersActivity.class);
-            // Passar os membros atuais para a próxima tela para que ela possa filtrá-los
             intent.putStringArrayListExtra("currentMembers", new ArrayList<>(chatroomModel.getUserIds()));
-            // AQUI ESTÁ A CORREÇÃO: Passar o ID do grupo para a tela de seleção
             intent.putExtra("chatroomId", chatroomId);
             startActivity(intent);
         });
+
+        // Listener para o novo botão
+        leaveGroupBtn.setOnClickListener(v -> showLeaveGroupDialog());
 
         getGroupDetails();
     }
 
     private void getGroupDetails() {
-        // Usar addSnapshotListener para atualizações em tempo real
         FirebaseUtil.getChatroomReference(chatroomId).addSnapshotListener((snapshot, e) -> {
             if (e != null) {
-                // Lidar com o erro
                 return;
             }
             if (snapshot != null && snapshot.exists()) {
@@ -73,19 +76,18 @@ public class GroupSettingsActivity extends AppCompatActivity {
         });
     }
 
-
     private void setupMembersRecyclerView() {
         if (adapter == null) {
             adapter = new GroupMemberRecyclerAdapter(this, chatroomModel.getUserIds(), chatroomModel);
             membersRecyclerView.setLayoutManager(new LinearLayoutManager(this));
             membersRecyclerView.setAdapter(adapter);
         } else {
-            // Apenas notificar o adapter de que os dados mudaram
             adapter.updateMembers(chatroomModel.getUserIds());
         }
     }
 
     private void showRenameGroupDialog() {
+        if (chatroomModel == null) return;
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Rename Group");
 
@@ -111,7 +113,36 @@ public class GroupSettingsActivity extends AppCompatActivity {
         builder.show();
     }
 
-    // Adicionar onResume para garantir que a lista seja atualizada ao voltar para a tela
+    // Nova função para o diálogo de confirmação
+    private void showLeaveGroupDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle("Leave Group")
+                .setMessage("Are you sure you want to leave this group?")
+                .setPositiveButton("Leave", (dialog, which) -> {
+                    leaveGroup();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    // Nova função para a lógica de sair do grupo
+    private void leaveGroup() {
+        if (chatroomModel != null) {
+            List<String> updatedUserIds = chatroomModel.getUserIds();
+            updatedUserIds.remove(FirebaseUtil.currentUserId());
+            chatroomModel.setUserIds(updatedUserIds);
+
+            FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel)
+                    .addOnSuccessListener(aVoid -> {
+                        Toast.makeText(this, "You have left the group", Toast.LENGTH_SHORT).show();
+                        Intent intent = new Intent(this, MainActivity.class);
+                        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                        startActivity(intent);
+                        finish();
+                    });
+        }
+    }
+
     @Override
     protected void onResume() {
         super.onResume();

@@ -78,15 +78,9 @@ public class FirebaseUtil {
                 .child(otherUserId);
     }
 
-
+    public static boolean isGroupChat(String chatroomId) {
+        // Se o ID do chat contém "_", é um chat individual.
+        // IDs de grupo gerados aleatoriamente pelo Firestore não contêm "_".
+        return !chatroomId.contains("_");
+    }
 }
-
-
-
-
-
-
-
-
-
-

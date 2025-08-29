@@ -49,7 +49,7 @@ public class ChatActivity extends AppCompatActivity {
 
     String chatroomId;
     ChatroomModel chatroomModel;
-    UserModel otherUser; // Apenas para chats individuais
+    UserModel otherUser;
 
     ChatRecyclerAdapter adapter;
     EditText messageInput;
@@ -75,8 +75,14 @@ public class ChatActivity extends AppCompatActivity {
 
         backBtn.setOnClickListener(v -> onBackPressed());
 
-        chatroomId = getIntent().getStringExtra("chatroomId");
+        // AQUI ESTÁ A CORREÇÃO
         otherUser = AndroidUtil.getUserModelFromIntent(getIntent());
+        chatroomId = getIntent().getStringExtra("chatroomId");
+
+        // Se o chatroomId for nulo, significa que estamos vindo da tela de busca para criar um novo chat.
+        if (chatroomId == null && otherUser != null) {
+            chatroomId = FirebaseUtil.getChatroomId(FirebaseUtil.currentUserId(), otherUser.getUserId());
+        }
 
         getChatroomData();
 
@@ -91,13 +97,17 @@ public class ChatActivity extends AppCompatActivity {
         FirebaseUtil.getChatroomReference(chatroomId).get().addOnCompleteListener(task -> {
             if (task.isSuccessful()) {
                 chatroomModel = task.getResult().toObject(ChatroomModel.class);
-                if (chatroomModel == null) {
-                    // Se a conversa foi deletada, não tente carregar
-                    if (!isFinishing()) {
-                        Toast.makeText(this, "Chat not found", Toast.LENGTH_SHORT).show();
-                        finish();
-                    }
-                    return;
+                // Se o chatroom não existir, criamos um novo (apenas para chats individuais)
+                if (chatroomModel == null && !FirebaseUtil.isGroupChat(chatroomId)) {
+                    chatroomModel = new ChatroomModel(
+                            chatroomId,
+                            Arrays.asList(FirebaseUtil.currentUserId(), otherUser.getUserId()),
+                            Timestamp.now(),
+                            "",
+                            "",
+                            false
+                    );
+                    FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel);
                 }
                 updateUI();
                 setupChatRecyclerView();
@@ -109,6 +119,8 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void updateUI() {
+        if (chatroomModel == null) return;
+
         if (chatroomModel.isGroupChat()) {
             toolbarTitle.setText(chatroomModel.getGroupName());
             toolbarProfilePic.setImageResource(R.drawable.chat_icon);
@@ -118,7 +130,6 @@ public class ChatActivity extends AppCompatActivity {
                 startActivity(intent);
             });
         } else {
-            // LÓGICA DE CLIQUE ATIVADA PARA CHAT INDIVIDUAL
             if (otherUser != null) {
                 toolbarTitle.setText(otherUser.getUsername());
                 FirebaseUtil.getOtherProfilePicStorageRef(otherUser.getUserId()).getDownloadUrl()

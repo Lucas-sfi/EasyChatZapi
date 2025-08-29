@@ -78,7 +78,17 @@
             android:id="@+id/members_recycler_view"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp" />
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="20dp"/>
+
+        <Button
+            android:id="@+id/leave_group_btn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:backgroundTint="@android:color/holo_red_dark"
+            android:text="Leave Group"
+            android:textColor="@color/white" />
+
     </LinearLayout>
 
 </RelativeLayout>
