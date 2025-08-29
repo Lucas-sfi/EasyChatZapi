@@ -9,6 +9,8 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
 import android.widget.EditText;
@@ -25,16 +27,15 @@ import com.example.easychat.model.UserModel;
 import com.example.easychat.utils.AndroidUtil;
 import com.example.easychat.utils.FirebaseUtil;
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.Task;
 import com.google.firebase.Timestamp;
-import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.Query;
+import com.google.firebase.firestore.QuerySnapshot;
 
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -61,6 +62,13 @@ public class ChatActivity extends AppCompatActivity {
     ImageView toolbarProfilePic;
     RelativeLayout toolbar;
 
+    ImageButton chatSearchButton;
+    RelativeLayout inChatSearchBar;
+    EditText inChatSearchInput;
+    ImageButton searchUpBtn, searchDownBtn;
+    private List<Integer> searchResultPositions = new ArrayList<>();
+    private int currentSearchIndex = -1;
+
     private long targetMessageTimestamp = -1;
 
     @Override
@@ -75,8 +83,11 @@ public class ChatActivity extends AppCompatActivity {
         recyclerView = findViewById(R.id.chat_recycler_view);
         toolbarProfilePic = findViewById(R.id.profile_pic_image_view);
         toolbar = findViewById(R.id.toolbar);
-
-        backBtn.setOnClickListener(v -> onBackPressed());
+        chatSearchButton = findViewById(R.id.chat_search_btn);
+        inChatSearchBar = findViewById(R.id.in_chat_search_bar);
+        inChatSearchInput = findViewById(R.id.in_chat_search_input);
+        searchUpBtn = findViewById(R.id.search_up_btn);
+        searchDownBtn = findViewById(R.id.search_down_btn);
 
         otherUser = AndroidUtil.getUserModelFromIntent(getIntent());
         chatroomId = getIntent().getStringExtra("chatroomId");
@@ -86,13 +97,98 @@ public class ChatActivity extends AppCompatActivity {
             chatroomId = FirebaseUtil.getChatroomId(FirebaseUtil.currentUserId(), otherUser.getUserId());
         }
 
-        getChatroomData();
-
+        backBtn.setOnClickListener(v -> onBackPressed());
         sendMessageBtn.setOnClickListener(v -> {
             String message = messageInput.getText().toString().trim();
             if (message.isEmpty()) return;
             sendMessage(message);
         });
+
+        chatSearchButton.setOnClickListener(v -> toggleSearchBar());
+        searchUpBtn.setOnClickListener(v -> navigateSearchResults(false));
+        searchDownBtn.setOnClickListener(v -> navigateSearchResults(true));
+
+        inChatSearchInput.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (s.length() > 0) {
+                    searchInChat(s.toString().toLowerCase());
+                } else {
+                    clearSearch();
+                }
+            }
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
+
+        getChatroomData();
+    }
+
+    private void toggleSearchBar() {
+        if (inChatSearchBar.getVisibility() == View.VISIBLE) {
+            inChatSearchBar.setVisibility(View.GONE);
+            clearSearch();
+        } else {
+            inChatSearchBar.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void searchInChat(String searchTerm) {
+        FirebaseUtil.getChatroomMessageReference(chatroomId)
+                .whereArrayContains("searchKeywords", searchTerm)
+                .get()
+                .addOnSuccessListener(queryDocumentSnapshots -> {
+                    searchResultPositions.clear();
+                    List<Timestamp> resultTimestamps = new ArrayList<>();
+                    for (DocumentSnapshot doc : queryDocumentSnapshots.getDocuments()) {
+                        resultTimestamps.add(doc.getTimestamp("timestamp"));
+                    }
+
+                    for (int i = 0; i < adapter.getItemCount(); i++) {
+                        ChatMessageModel message = adapter.getItem(i);
+                        if (resultTimestamps.contains(message.getTimestamp())) {
+                            searchResultPositions.add(i);
+                        }
+                    }
+
+                    if (!searchResultPositions.isEmpty()) {
+                        currentSearchIndex = 0;
+                        navigateToCurrentSearchResult();
+                    } else {
+                        currentSearchIndex = -1;
+                        adapter.highlightMessage(null);
+                    }
+                });
+    }
+
+    private void navigateSearchResults(boolean down) {
+        if (searchResultPositions.isEmpty()) return;
+
+        if (down) {
+            currentSearchIndex = (currentSearchIndex + 1) % searchResultPositions.size();
+        } else {
+            currentSearchIndex = (currentSearchIndex - 1 + searchResultPositions.size()) % searchResultPositions.size();
+        }
+        navigateToCurrentSearchResult();
+    }
+
+    private void navigateToCurrentSearchResult() {
+        if (currentSearchIndex != -1 && currentSearchIndex < searchResultPositions.size()) {
+            int position = searchResultPositions.get(currentSearchIndex);
+            recyclerView.smoothScrollToPosition(position);
+            String messageId = adapter.getSnapshots().getSnapshot(position).getId();
+            adapter.highlightMessage(messageId);
+        }
+    }
+
+    private void clearSearch() {
+        if (adapter != null) {
+            adapter.highlightMessage(null);
+        }
+        searchResultPositions.clear();
+        currentSearchIndex = -1;
     }
 
     @Override
@@ -122,13 +218,8 @@ public class ChatActivity extends AppCompatActivity {
             if (task.isSuccessful()) {
                 chatroomModel = task.getResult().toObject(ChatroomModel.class);
                 if (chatroomModel == null) {
-                    // Se a conversa não existir (caso de 1-para-1), cria-a
                     if (!FirebaseUtil.isGroupChat(chatroomId)) {
-                        chatroomModel = new ChatroomModel(
-                                chatroomId,
-                                Arrays.asList(FirebaseUtil.currentUserId(), otherUser.getUserId()),
-                                Timestamp.now(), "", "", false
-                        );
+                        chatroomModel = new ChatroomModel(chatroomId, Arrays.asList(FirebaseUtil.currentUserId(), otherUser.getUserId()), Timestamp.now(), "", "", false);
                         FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel);
                     } else {
                         Toast.makeText(this, "Chatroom not found", Toast.LENGTH_SHORT).show();
@@ -137,8 +228,7 @@ public class ChatActivity extends AppCompatActivity {
                     }
                 }
 
-                // LÓGICA CORRIGIDA: Se for um chat individual, carregar o 'otherUser'
-                if (!chatroomModel.isGroupChat()) {
+                if (!chatroomModel.isGroupChat() && otherUser == null) {
                     FirebaseUtil.getOtherUserFromChatroom(chatroomModel.getUserIds()).get()
                             .addOnSuccessListener(documentSnapshot -> {
                                 otherUser = documentSnapshot.toObject(UserModel.class);
@@ -204,7 +294,7 @@ public class ChatActivity extends AppCompatActivity {
             @Override
             public void onItemRangeInserted(int positionStart, int itemCount) {
                 super.onItemRangeInserted(positionStart, itemCount);
-                if (targetMessageTimestamp == -1) {
+                if (targetMessageTimestamp == -1 && inChatSearchBar.getVisibility() == View.GONE) {
                     recyclerView.smoothScrollToPosition(adapter.getItemCount() - 1);
                 }
             }
@@ -212,11 +302,12 @@ public class ChatActivity extends AppCompatActivity {
 
         if (targetMessageTimestamp != -1) {
             query.get().addOnSuccessListener(queryDocumentSnapshots -> {
-                List<ChatMessageModel> messages = queryDocumentSnapshots.toObjects(ChatMessageModel.class);
-                for (int i = 0; i < messages.size(); i++) {
-                    if (messages.get(i).getTimestamp().toDate().getTime() == targetMessageTimestamp) {
+                List<DocumentSnapshot> snapshots = queryDocumentSnapshots.getDocuments();
+                for (int i = 0; i < snapshots.size(); i++) {
+                    if (snapshots.get(i).getTimestamp("timestamp").toDate().getTime() == targetMessageTimestamp) {
                         final int position = i;
                         new Handler().postDelayed(() -> recyclerView.smoothScrollToPosition(position), 200);
+                        adapter.highlightMessage(snapshots.get(i).getId());
                         break;
                     }
                 }
@@ -230,6 +321,19 @@ public class ChatActivity extends AppCompatActivity {
         }
     }
 
+    private List<String> generateKeywords(String text) {
+        String searchableString = text.toLowerCase().replaceAll("[^a-zA-Z0-9\\s]", "");
+        List<String> keywords = new ArrayList<>();
+        for (String word : searchableString.split("\\s+")) {
+            if (word.length() > 0) {
+                for (int i = 1; i <= word.length(); i++) {
+                    keywords.add(word.substring(0, i));
+                }
+            }
+        }
+        return keywords;
+    }
+
     private void sendMessage(String message) {
         if (chatroomModel == null) return;
         chatroomModel.setLastMessageTimestamp(Timestamp.now());
@@ -237,8 +341,7 @@ public class ChatActivity extends AppCompatActivity {
         chatroomModel.setLastMessage(message);
         FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel);
 
-        String searchableString = message.toLowerCase().replaceAll("[^a-zA-Z0-9\\s]", "");
-        List<String> keywords = Arrays.asList(searchableString.split("\\s+"));
+        List<String> keywords = generateKeywords(message);
         ChatMessageModel chatMessageModel = new ChatMessageModel(message, FirebaseUtil.currentUserId(), Timestamp.now(), ChatMessageModel.STATUS_SENT, keywords);
 
         FirebaseUtil.getChatroomMessageReference(chatroomId).add(chatMessageModel)
@@ -252,7 +355,6 @@ public class ChatActivity extends AppCompatActivity {
                 });
     }
 
-    // As funções sendNotification e callApi continuam iguais
     void sendNotification(String message) {
         if (otherUser == null || otherUser.getFcmToken() == null) return;
         FirebaseUtil.currentUserDetails().get().addOnCompleteListener(task -> {

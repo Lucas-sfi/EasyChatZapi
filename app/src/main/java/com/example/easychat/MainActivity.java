@@ -11,17 +11,14 @@ import android.widget.ImageButton;
 
 import com.example.easychat.model.ChatMessageModel;
 import com.example.easychat.model.ChatroomModel;
-import com.example.easychat.model.UserModel;
 import com.example.easychat.utils.FirebaseUtil;
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.Task;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.navigation.NavigationBarView;
 import com.google.firebase.firestore.DocumentSnapshot;
-import com.google.firebase.firestore.QuerySnapshot;
 import com.google.firebase.messaging.FirebaseMessaging;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -60,27 +57,39 @@ public class MainActivity extends AppCompatActivity {
             startActivity(new Intent(MainActivity.this, SelectGroupMembersActivity.class));
         });
 
-        bottomNavigationView.setOnItemSelectedListener(new NavigationBarView.OnItemSelectedListener() {
-            @Override
-            public boolean onNavigationItemSelected(@NonNull MenuItem item) {
-                if(item.getItemId()==R.id.menu_chat){
-                    getSupportFragmentManager().beginTransaction().replace(R.id.main_frame_layout,chatFragment).commit();
-                }
-                if(item.getItemId()==R.id.menu_profile){
-                    getSupportFragmentManager().beginTransaction().replace(R.id.main_frame_layout,profileFragment).commit();
-                }
-                return true;
+        bottomNavigationView.setOnItemSelectedListener(item -> {
+            if(item.getItemId()==R.id.menu_chat){
+                getSupportFragmentManager().beginTransaction().replace(R.id.main_frame_layout,chatFragment).commit();
             }
+            if(item.getItemId()==R.id.menu_profile){
+                getSupportFragmentManager().beginTransaction().replace(R.id.main_frame_layout,profileFragment).commit();
+            }
+            return true;
         });
         bottomNavigationView.setSelectedItemId(R.id.menu_chat);
 
         getFCMToken();
 
-        // CHAME A NOVA FUNÇÃO DE MIGRAÇÃO AQUI
+        // CHAME A FUNÇÃO DE MIGRAÇÃO AQUI (APENAS UMA VEZ!)
         migrateMessagesData();
     }
 
-    // FUNÇÃO DE MIGRAÇÃO TEMPORÁRIA PARA MENSAGENS
+    private List<String> generateKeywordsForMigration(String text) {
+        if (text == null || text.isEmpty()) {
+            return new ArrayList<>();
+        }
+        String searchableString = text.toLowerCase().replaceAll("[^a-zA-Z0-9\\s]", "");
+        List<String> keywords = new ArrayList<>();
+        for (String word : searchableString.split("\\s+")) {
+            if (word.length() > 0) {
+                for (int i = 1; i <= word.length(); i++) {
+                    keywords.add(word.substring(0, i));
+                }
+            }
+        }
+        return keywords;
+    }
+
     void migrateMessagesData() {
         FirebaseUtil.allChatroomCollectionReference()
                 .whereArrayContains("userIds", FirebaseUtil.currentUserId())
@@ -91,20 +100,20 @@ public class MainActivity extends AppCompatActivity {
                                 .addOnSuccessListener(messageSnapshots -> {
                                     for (DocumentSnapshot messageDoc : messageSnapshots.getDocuments()) {
                                         ChatMessageModel message = messageDoc.toObject(ChatMessageModel.class);
-                                        if (message != null && message.getSearchKeywords() == null) {
+                                        if (message != null) {
                                             String messageText = message.getMessage();
-                                            if (messageText != null && !messageText.isEmpty()) {
-                                                String searchableString = messageText.toLowerCase().replaceAll("[^a-zA-Z0-9\\s]", "");
-                                                List<String> keywords = Arrays.asList(searchableString.split("\\s+"));
-                                                messageDoc.getReference().update("searchKeywords", keywords)
-                                                        .addOnSuccessListener(aVoid -> Log.d("MsgMigration", "Message updated: " + messageDoc.getId()))
-                                                        .addOnFailureListener(e -> Log.e("MsgMigration", "Error updating message: " + messageDoc.getId(), e));
+                                            List<String> newKeywords = generateKeywordsForMigration(messageText);
+                                            // Apenas atualiza se as keywords forem diferentes (para evitar escritas desnecessárias)
+                                            if (!newKeywords.equals(message.getSearchKeywords())) {
+                                                messageDoc.getReference().update("searchKeywords", newKeywords)
+                                                        .addOnSuccessListener(aVoid -> Log.d("MsgMigration", "Message prefixes updated: " + messageDoc.getId()))
+                                                        .addOnFailureListener(e -> Log.e("MsgMigration", "Error updating message prefixes: " + messageDoc.getId(), e));
                                             }
                                         }
                                     }
                                 });
                     }
-                    Log.d("MsgMigration", "Message migration check completed.");
+                    Log.d("MsgMigration", "Message prefix migration check completed.");
                 });
     }
 

@@ -22,15 +22,25 @@ import com.firebase.ui.firestore.FirestoreRecyclerOptions;
 public class ChatRecyclerAdapter extends FirestoreRecyclerAdapter<ChatMessageModel, ChatRecyclerAdapter.ChatModelViewHolder> {
 
     Context context;
+    private String highlightedMessageId = null; // ID da mensagem a ser destacada
 
-    public ChatRecyclerAdapter(@NonNull FirestoreRecyclerOptions<ChatMessageModel> options,Context context) {
+    public ChatRecyclerAdapter(@NonNull FirestoreRecyclerOptions<ChatMessageModel> options, Context context) {
         super(options);
         this.context = context;
     }
 
     @Override
     protected void onBindViewHolder(@NonNull ChatModelViewHolder holder, int position, @NonNull ChatMessageModel model) {
-        if(model.getSenderId().equals(FirebaseUtil.currentUserId())){
+        String currentMessageId = getSnapshots().getSnapshot(position).getId();
+
+        // LÓGICA DE DESTAQUE
+        if (currentMessageId.equals(highlightedMessageId)) {
+            holder.itemView.setBackgroundColor(ContextCompat.getColor(context, R.color.my_secondary));
+        } else {
+            holder.itemView.setBackgroundColor(Color.TRANSPARENT);
+        }
+
+        if (model.getSenderId().equals(FirebaseUtil.currentUserId())) {
             holder.leftChatLayout.setVisibility(View.GONE);
             holder.rightChatLayout.setVisibility(View.VISIBLE);
             holder.rightChatTextview.setText(model.getMessage());
@@ -43,7 +53,7 @@ public class ChatRecyclerAdapter extends FirestoreRecyclerAdapter<ChatMessageMod
                 holder.statusIcon.setColorFilter(Color.GRAY);
             }
 
-        }else{
+        } else {
             holder.rightChatLayout.setVisibility(View.GONE);
             holder.leftChatLayout.setVisibility(View.VISIBLE);
             holder.leftChatTextview.setText(model.getMessage());
@@ -53,13 +63,19 @@ public class ChatRecyclerAdapter extends FirestoreRecyclerAdapter<ChatMessageMod
     @NonNull
     @Override
     public ChatModelViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(context).inflate(R.layout.chat_message_recycler_row,parent,false);
+        View view = LayoutInflater.from(context).inflate(R.layout.chat_message_recycler_row, parent, false);
         return new ChatModelViewHolder(view);
     }
 
-    class ChatModelViewHolder extends RecyclerView.ViewHolder{
-        LinearLayout leftChatLayout,rightChatLayout;
-        TextView leftChatTextview,rightChatTextview;
+    // Método para definir qual mensagem destacar
+    public void highlightMessage(String messageId) {
+        highlightedMessageId = messageId;
+        notifyDataSetChanged();
+    }
+
+    static class ChatModelViewHolder extends RecyclerView.ViewHolder {
+        LinearLayout leftChatLayout, rightChatLayout;
+        TextView leftChatTextview, rightChatTextview;
         ImageView statusIcon;
 
         public ChatModelViewHolder(@NonNull View itemView) {
