@@ -38,105 +38,75 @@ public class RecentChatRecyclerAdapter extends FirestoreRecyclerAdapter<Chatroom
         intent.putExtra("chatroomId", model.getChatroomId());
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
+        boolean hasCustomNotif = model.getCustomNotificationStatus()
+                .getOrDefault(FirebaseUtil.currentUserId(), false);
+
         if (model.isGroupChat()) {
-            // LÓGICA PARA GRUPO
             holder.usernameText.setText(model.getGroupName());
             holder.profilePic.setImageResource(R.drawable.chat_icon);
+            holder.statusIndicator.setVisibility(View.GONE);
             holder.lastMessageTime.setText(FirebaseUtil.timestampToString(model.getLastMessageTimestamp()));
             holder.lastMessageText.setText(model.getLastMessage());
-
-            // Contar mensagens não lidas no grupo (mensagens não enviadas pelo utilizador atual)
-            FirebaseUtil.getChatroomMessageReference(model.getChatroomId())
-                    .whereNotEqualTo("senderId", FirebaseUtil.currentUserId())
-                    // Para uma contagem real de "não lidas", precisaríamos de um sistema mais complexo.
-                    // Por agora, vamos assumir que qualquer mensagem de outro membro é "não lida" até entrarmos.
-                    // Esta lógica irá limpar a notificação visualmente quando o utilizador voltar ao ChatFragment.
-                    .get()
-                    .addOnCompleteListener(countTask -> {
-                        if (countTask.isSuccessful()) {
-                            // Esta contagem é uma simplificação. Para ser precisa, precisaria de um timestamp "lastRead".
-                            // Mas para o efeito visual de limpar ao entrar, isto funciona.
-                            int unreadCount = countTask.getResult().size();
-
-                            // Lógica do Círculo
-                            if (unreadCount > 0 && !model.getLastMessageSenderId().equals(FirebaseUtil.currentUserId())) {
-                                holder.unreadCountText.setText(String.valueOf(unreadCount));
-                                holder.unreadCountText.setVisibility(View.VISIBLE);
-                            } else {
-                                holder.unreadCountText.setVisibility(View.GONE);
-                            }
-
-                            // Lógica da Borda
-                            boolean hasCustomNotif = model.getCustomNotificationStatus()
-                                    .getOrDefault(FirebaseUtil.currentUserId(), false);
-
-                            if (hasCustomNotif && unreadCount > 0 && !model.getLastMessageSenderId().equals(FirebaseUtil.currentUserId())) {
-                                holder.itemView.setBackground(ContextCompat.getDrawable(context, R.drawable.list_item_background_highlight));
-                            } else {
-                                holder.itemView.setBackground(ContextCompat.getDrawable(context, R.drawable.edit_text_rounded_corner));
-                            }
-                        }
-                    });
-
+            holder.unreadCountText.setVisibility(View.GONE);
+            holder.itemView.setBackground(ContextCompat.getDrawable(context, R.drawable.edit_text_rounded_corner));
         } else {
-            // LÓGICA PARA CONVERSA INDIVIDUAL (já existente e correta)
             FirebaseUtil.getOtherUserFromChatroom(model.getUserIds())
-                    .get().addOnCompleteListener(task -> {
-                        if (task.isSuccessful()) {
-                            UserModel otherUserModel = task.getResult().toObject(UserModel.class);
-                            if (otherUserModel == null) return;
+                    .addSnapshotListener((value, error) -> {
+                        if (error != null || value == null || !value.exists()) return;
+                        UserModel otherUserModel = value.toObject(UserModel.class);
+                        if (otherUserModel == null) return;
 
-                            AndroidUtil.passUserModelAsIntent(intent, otherUserModel);
-                            boolean lastMessageSentByMe = model.getLastMessageSenderId().equals(FirebaseUtil.currentUserId());
-
-                            FirebaseUtil.getOtherProfilePicStorageRef(otherUserModel.getUserId()).getDownloadUrl()
-                                    .addOnCompleteListener(t -> {
-                                        if (t.isSuccessful()) {
-                                            Uri uri = t.getResult();
-                                            AndroidUtil.setProfilePic(context, uri, holder.profilePic);
-                                        }
-                                    });
-
-                            holder.usernameText.setText(otherUserModel.getUsername());
-                            if (lastMessageSentByMe) {
-                                holder.lastMessageText.setText("You: " + model.getLastMessage());
-                            } else {
-                                holder.lastMessageText.setText(model.getLastMessage());
-                            }
-                            holder.lastMessageTime.setText(FirebaseUtil.timestampToString(model.getLastMessageTimestamp()));
-
-                            String chatroomId = FirebaseUtil.getChatroomId(FirebaseUtil.currentUserId(), otherUserModel.getUserId());
-                            FirebaseUtil.getChatroomMessageReference(chatroomId)
-                                    .whereEqualTo("senderId", otherUserModel.getUserId())
-                                    .whereEqualTo("status", ChatMessageModel.STATUS_SENT)
-                                    .get()
-                                    .addOnCompleteListener(countTask -> {
-                                        if (countTask.isSuccessful()) {
-                                            int unreadCount = countTask.getResult().size();
-                                            if (unreadCount > 0) {
-                                                holder.unreadCountText.setText(String.valueOf(unreadCount));
-                                                holder.unreadCountText.setVisibility(View.VISIBLE);
-                                            } else {
-                                                holder.unreadCountText.setVisibility(View.GONE);
-                                            }
-
-                                            boolean hasCustomNotif = model.getCustomNotificationStatus()
-                                                    .getOrDefault(FirebaseUtil.currentUserId(), false);
-
-                                            if (hasCustomNotif && unreadCount > 0) {
-                                                holder.itemView.setBackground(ContextCompat.getDrawable(context, R.drawable.list_item_background_highlight));
-                                            } else {
-                                                holder.itemView.setBackground(ContextCompat.getDrawable(context, R.drawable.edit_text_rounded_corner));
-                                            }
-                                        }
-                                    });
+                        // LÓGICA DE STATUS ATUALIZADA
+                        holder.statusIndicator.setVisibility(View.VISIBLE);
+                        if ("busy".equals(otherUserModel.getUserStatus())) {
+                            holder.statusIndicator.setImageResource(R.drawable.busy_indicator);
+                        } else if ("online".equals(otherUserModel.getUserStatus())) {
+                            holder.statusIndicator.setImageResource(R.drawable.online_indicator);
+                        } else {
+                            holder.statusIndicator.setImageResource(R.drawable.offline_indicator);
                         }
+
+                        AndroidUtil.passUserModelAsIntent(intent, otherUserModel);
+                        boolean lastMessageSentByMe = model.getLastMessageSenderId().equals(FirebaseUtil.currentUserId());
+
+                        FirebaseUtil.getOtherProfilePicStorageRef(otherUserModel.getUserId()).getDownloadUrl()
+                                .addOnCompleteListener(t -> {
+                                    if (t.isSuccessful()) {
+                                        Uri uri = t.getResult();
+                                        AndroidUtil.setProfilePic(context, uri, holder.profilePic);
+                                    }
+                                });
+
+                        holder.usernameText.setText(otherUserModel.getUsername());
+                        if (lastMessageSentByMe) holder.lastMessageText.setText("You: " + model.getLastMessage());
+                        else holder.lastMessageText.setText(model.getLastMessage());
+                        holder.lastMessageTime.setText(FirebaseUtil.timestampToString(model.getLastMessageTimestamp()));
+
+                        String chatroomId = FirebaseUtil.getChatroomId(FirebaseUtil.currentUserId(), otherUserModel.getUserId());
+                        FirebaseUtil.getChatroomMessageReference(chatroomId)
+                                .whereEqualTo("senderId", otherUserModel.getUserId())
+                                .whereEqualTo("status", ChatMessageModel.STATUS_SENT)
+                                .get()
+                                .addOnCompleteListener(countTask -> {
+                                    if (countTask.isSuccessful()) {
+                                        int unreadCount = countTask.getResult().size();
+                                        if (unreadCount > 0) {
+                                            holder.unreadCountText.setText(String.valueOf(unreadCount));
+                                            holder.unreadCountText.setVisibility(View.VISIBLE);
+                                        } else {
+                                            holder.unreadCountText.setVisibility(View.GONE);
+                                        }
+                                        if (hasCustomNotif && unreadCount > 0) {
+                                            holder.itemView.setBackground(ContextCompat.getDrawable(context, R.drawable.list_item_background_highlight));
+                                        } else {
+                                            holder.itemView.setBackground(ContextCompat.getDrawable(context, R.drawable.edit_text_rounded_corner));
+                                        }
+                                    }
+                                });
                     });
         }
 
-        holder.itemView.setOnClickListener(v -> {
-            context.startActivity(intent);
-        });
+        holder.itemView.setOnClickListener(v -> context.startActivity(intent));
     }
 
     @NonNull
@@ -146,12 +116,9 @@ public class RecentChatRecyclerAdapter extends FirestoreRecyclerAdapter<Chatroom
         return new ChatroomModelViewHolder(view);
     }
 
-    class ChatroomModelViewHolder extends RecyclerView.ViewHolder {
-        TextView usernameText;
-        TextView lastMessageText;
-        TextView lastMessageTime;
-        ImageView profilePic;
-        TextView unreadCountText;
+    static class ChatroomModelViewHolder extends RecyclerView.ViewHolder {
+        TextView usernameText, lastMessageText, lastMessageTime, unreadCountText;
+        ImageView profilePic, statusIndicator;
 
         public ChatroomModelViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -160,6 +127,7 @@ public class RecentChatRecyclerAdapter extends FirestoreRecyclerAdapter<Chatroom
             lastMessageTime = itemView.findViewById(R.id.last_message_time_text);
             profilePic = itemView.findViewById(R.id.profile_pic_image_view);
             unreadCountText = itemView.findViewById(R.id.unread_message_count_text);
+            statusIndicator = itemView.findViewById(R.id.status_indicator);
         }
     }
 }

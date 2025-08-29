@@ -4,13 +4,11 @@ import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
-
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
-
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -19,17 +17,14 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
-
 import com.example.easychat.model.UserModel;
 import com.example.easychat.utils.AndroidUtil;
 import com.example.easychat.utils.FirebaseUtil;
 import com.github.dhaval2404.imagepicker.ImagePicker;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
-import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.google.firebase.messaging.FirebaseMessaging;
-import com.google.firebase.storage.UploadTask;
-
 import kotlin.Unit;
 import kotlin.jvm.functions.Function1;
 
@@ -41,14 +36,13 @@ public class ProfileFragment extends Fragment {
     Button updateProfileBtn;
     ProgressBar progressBar;
     TextView logoutBtn;
+    SwitchMaterial busySwitch; // Novo Switch
 
     UserModel currentUserModel;
     ActivityResultLauncher<Intent> imagePickLauncher;
     Uri selectedImageUri;
 
-    public ProfileFragment() {
-
-    }
+    public ProfileFragment() {}
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -67,8 +61,7 @@ public class ProfileFragment extends Fragment {
     }
 
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
-                             Bundle savedInstanceState) {
+    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view =  inflater.inflate(R.layout.fragment_profile, container, false);
         profilePic = view.findViewById(R.id.profile_image_view);
         usernameInput = view.findViewById(R.id.profile_username);
@@ -76,38 +69,28 @@ public class ProfileFragment extends Fragment {
         updateProfileBtn = view.findViewById(R.id.profle_update_btn);
         progressBar = view.findViewById(R.id.profile_progress_bar);
         logoutBtn = view.findViewById(R.id.logout_btn);
+        busySwitch = view.findViewById(R.id.busy_switch); // Referência
 
         getUserData();
 
-        updateProfileBtn.setOnClickListener((v -> {
-            updateBtnClick();
-        }));
+        updateProfileBtn.setOnClickListener((v -> updateBtnClick()));
 
         logoutBtn.setOnClickListener((v)->{
-            FirebaseMessaging.getInstance().deleteToken().addOnCompleteListener(new OnCompleteListener<Void>() {
-                @Override
-                public void onComplete(@NonNull Task<Void> task) {
-                    if(task.isSuccessful()){
-                        FirebaseUtil.logout();
-                        Intent intent = new Intent(getContext(),SplashActivity.class);
-                        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                        startActivity(intent);
-                    }
+            FirebaseMessaging.getInstance().deleteToken().addOnCompleteListener(task -> {
+                if(task.isSuccessful()){
+                    FirebaseUtil.logout();
+                    Intent intent = new Intent(getContext(),SplashActivity.class);
+                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                    startActivity(intent);
                 }
             });
-
-
-
         });
 
         profilePic.setOnClickListener((v)->{
             ImagePicker.with(this).cropSquare().compress(512).maxResultSize(512,512)
-                    .createIntent(new Function1<Intent, Unit>() {
-                        @Override
-                        public Unit invoke(Intent intent) {
-                            imagePickLauncher.launch(intent);
-                            return null;
-                        }
+                    .createIntent(intent -> {
+                        imagePickLauncher.launch(intent);
+                        return null;
                     });
         });
 
@@ -123,20 +106,12 @@ public class ProfileFragment extends Fragment {
         currentUserModel.setUsername(newUsername);
         setInProgress(true);
 
-
         if(selectedImageUri!=null){
             FirebaseUtil.getCurrentProfilePicStorageRef().putFile(selectedImageUri)
-                    .addOnCompleteListener(task -> {
-                        updateToFirestore();
-                    });
+                    .addOnCompleteListener(task -> updateToFirestore());
         }else{
             updateToFirestore();
         }
-
-
-
-
-
     }
 
     void updateToFirestore(){
@@ -151,11 +126,8 @@ public class ProfileFragment extends Fragment {
                 });
     }
 
-
-
     void getUserData(){
         setInProgress(true);
-
         FirebaseUtil.getCurrentProfilePicStorageRef().getDownloadUrl()
                 .addOnCompleteListener(task -> {
                     if(task.isSuccessful()){
@@ -167,15 +139,23 @@ public class ProfileFragment extends Fragment {
         FirebaseUtil.currentUserDetails().get().addOnCompleteListener(task -> {
             setInProgress(false);
             currentUserModel = task.getResult().toObject(UserModel.class);
-
-            // AQUI ESTÁ A CORREÇÃO:
             if(currentUserModel != null){
                 usernameInput.setText(currentUserModel.getUsername());
                 phoneInput.setText(currentUserModel.getPhone());
+                // Configurar o Switch
+                busySwitch.setChecked("busy".equals(currentUserModel.getUserStatus()));
+                busySwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                    if (isChecked) {
+                        currentUserModel.setUserStatus("busy");
+                    } else {
+                        // Ao desativar, o status volta a ser gerido automaticamente
+                        currentUserModel.setUserStatus("online");
+                    }
+                    updateToFirestore();
+                });
             }
         });
     }
-
 
     void setInProgress(boolean inProgress){
         if(inProgress){

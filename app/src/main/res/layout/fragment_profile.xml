@@ -9,16 +9,25 @@
     android:layout_margin="20dp">
 
     <ImageView
+        android:id="@+id/profile_image_view"
         android:layout_width="160dp"
         android:layout_height="160dp"
         android:background="@drawable/circular_bg"
         android:backgroundTint="@color/my_primary"
         android:src="@drawable/person_icon"
         android:scaleType="centerCrop"
-        android:layout_marginBottom="40dp"
-        android:id="@+id/profile_image_view"/>
+        android:layout_marginBottom="40dp"/>
+
+    <com.google.android.material.switchmaterial.SwitchMaterial
+        android:id="@+id/busy_switch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Set as Busy"
+        android:textSize="18sp"
+        android:layout_marginBottom="20dp"/>
 
     <EditText
+        android:id="@+id/profile_username"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:padding="10dp"
@@ -26,10 +35,9 @@
         android:inputType="text"
         android:layout_margin="10dp"
         android:background="@drawable/edit_text_rounded_corner"
-        android:elevation="5dp"
-        android:id="@+id/profile_username"
-        />
+        android:elevation="5dp"/>
     <EditText
+        android:id="@+id/profile_phone"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:padding="10dp"
@@ -38,9 +46,7 @@
         android:layout_margin="10dp"
         android:background="@drawable/edit_text_rounded_corner"
         android:elevation="5dp"
-        android:enabled="false"
-        android:id="@+id/profile_phone"
-        />
+        android:enabled="false"/>
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -49,25 +55,23 @@
         android:layout_marginTop="20dp"
         android:orientation="vertical">
         <Button
+            android:id="@+id/profle_update_btn"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="@drawable/btn_rounded_corner"
-            android:text="Update profile"
-            android:id="@+id/profle_update_btn"/>
+            android:text="Update profile"/>
         <ProgressBar
+            android:id="@+id/profile_progress_bar"
             android:layout_width="32dp"
             android:layout_height="wrap_content"
             android:indeterminateTint="@color/my_primary"
-            android:layout_gravity="center"
-            android:id="@+id/profile_progress_bar"/>
+            android:layout_gravity="center"/>
     </LinearLayout>
 
     <TextView
+        android:id="@+id/logout_btn"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Logout"
-        android:id="@+id/logout_btn"/>
-
-
+        android:text="Logout"/>
 
 </LinearLayout>
