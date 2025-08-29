@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1031511514669",
+    "project_id": "meu-easy-chat",
+    "storage_bucket": "meu-easy-chat.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1031511514669:android:dcd77c597b4eaf6c2f62a4",
+        "android_client_info": {
+          "package_name": "com.example.easychat"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD-7kXx0MWajhNy3r-zbyf8G91mgaxLkXk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
