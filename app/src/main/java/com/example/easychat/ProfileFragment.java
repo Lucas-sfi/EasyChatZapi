@@ -36,7 +36,7 @@ public class ProfileFragment extends Fragment {
     Button updateProfileBtn;
     ProgressBar progressBar;
     TextView logoutBtn;
-    SwitchMaterial busySwitch; // Novo Switch
+    SwitchMaterial busySwitch;
 
     UserModel currentUserModel;
     ActivityResultLauncher<Intent> imagePickLauncher;
@@ -69,7 +69,7 @@ public class ProfileFragment extends Fragment {
         updateProfileBtn = view.findViewById(R.id.profle_update_btn);
         progressBar = view.findViewById(R.id.profile_progress_bar);
         logoutBtn = view.findViewById(R.id.logout_btn);
-        busySwitch = view.findViewById(R.id.busy_switch); // Referência
+        busySwitch = view.findViewById(R.id.busy_switch);
 
         getUserData();
 
@@ -104,6 +104,7 @@ public class ProfileFragment extends Fragment {
             return;
         }
         currentUserModel.setUsername(newUsername);
+        currentUserModel.setSearchUsername(newUsername.toLowerCase()); // Atualizar o campo de pesquisa
         setInProgress(true);
 
         if(selectedImageUri!=null){
@@ -142,13 +143,11 @@ public class ProfileFragment extends Fragment {
             if(currentUserModel != null){
                 usernameInput.setText(currentUserModel.getUsername());
                 phoneInput.setText(currentUserModel.getPhone());
-                // Configurar o Switch
                 busySwitch.setChecked("busy".equals(currentUserModel.getUserStatus()));
                 busySwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
                     if (isChecked) {
                         currentUserModel.setUserStatus("busy");
                     } else {
-                        // Ao desativar, o status volta a ser gerido automaticamente
                         currentUserModel.setUserStatus("online");
                     }
                     updateToFirestore();

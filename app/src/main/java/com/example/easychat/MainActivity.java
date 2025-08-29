@@ -9,12 +9,15 @@ import android.util.Log;
 import android.view.MenuItem;
 import android.widget.ImageButton;
 
+import com.example.easychat.model.UserModel;
 import com.example.easychat.utils.FirebaseUtil;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.navigation.NavigationBarView;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.QuerySnapshot;
 import com.google.firebase.messaging.FirebaseMessaging;
 
 public class MainActivity extends AppCompatActivity {
@@ -42,9 +45,7 @@ public class MainActivity extends AppCompatActivity {
             startActivity(new Intent(MainActivity.this,SearchUserActivity.class));
         });
 
-        // AÇÃO DO BOTÃO + MODIFICADA
         addNewChatBtn.setOnClickListener((v) -> {
-            // Em vez de ir para a busca, agora vai para a seleção de membros do grupo
             startActivity(new Intent(MainActivity.this, SelectGroupMembersActivity.class));
         });
 
@@ -64,6 +65,31 @@ public class MainActivity extends AppCompatActivity {
 
         getFCMToken();
 
+        // CHAME A FUNÇÃO DE MIGRAÇÃO AQUI
+        migrateUserData();
+    }
+
+    // FUNÇÃO DE MIGRAÇÃO TEMPORÁRIA
+    void migrateUserData() {
+        FirebaseUtil.allUserCollectionReference().get().addOnCompleteListener(task -> {
+            if (task.isSuccessful()) {
+                for (DocumentSnapshot document : task.getResult()) {
+                    UserModel user = document.toObject(UserModel.class);
+                    // Verifica se o campo de pesquisa está em falta ou nulo
+                    if (user != null && user.getSearchUsername() == null) {
+                        String username = user.getUsername();
+                        if (username != null) {
+                            document.getReference().update("searchUsername", username.toLowerCase())
+                                    .addOnSuccessListener(aVoid -> Log.d("Migration", "User updated: " + user.getUserId()))
+                                    .addOnFailureListener(e -> Log.e("Migration", "Error updating user: " + user.getUserId(), e));
+                        }
+                    }
+                }
+                Log.d("Migration", "Data migration check completed.");
+            } else {
+                Log.e("Migration", "Error getting documents: ", task.getException());
+            }
+        });
     }
 
     void getFCMToken(){

@@ -98,7 +98,6 @@ public class ChatActivity extends AppCompatActivity {
     }
 
     private void markMessagesAsRead() {
-        // Apenas marcar como lido para conversas individuais
         if (chatroomModel != null && !chatroomModel.isGroupChat() && otherUser != null) {
             FirebaseUtil.getChatroomMessageReference(chatroomId)
                     .whereEqualTo("senderId", otherUser.getUserId())
@@ -194,7 +193,11 @@ public class ChatActivity extends AppCompatActivity {
         chatroomModel.setLastMessageSenderId(FirebaseUtil.currentUserId());
         chatroomModel.setLastMessage(message);
         FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel);
-        ChatMessageModel chatMessageModel = new ChatMessageModel(message, FirebaseUtil.currentUserId(), Timestamp.now(), ChatMessageModel.STATUS_SENT);
+
+        // LÓGICA DE CRIAÇÃO DE PALAVRAS-CHAVE
+        List<String> keywords = Arrays.asList(message.toLowerCase().split(" "));
+        ChatMessageModel chatMessageModel = new ChatMessageModel(message, FirebaseUtil.currentUserId(), Timestamp.now(), ChatMessageModel.STATUS_SENT, keywords);
+
         FirebaseUtil.getChatroomMessageReference(chatroomId).add(chatMessageModel)
                 .addOnCompleteListener(task -> {
                     if (task.isSuccessful()) {

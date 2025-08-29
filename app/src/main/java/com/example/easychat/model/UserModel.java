@@ -5,10 +5,11 @@ import com.google.firebase.Timestamp;
 public class UserModel {
     private String phone;
     private String username;
+    private String searchUsername; // Novo campo para pesquisa
     private Timestamp createdTimestamp;
     private String userId;
     private String fcmToken;
-    private String userStatus; // Campo atualizado de boolean para String
+    private String userStatus;
 
     public UserModel() {
     }
@@ -16,18 +17,19 @@ public class UserModel {
     public UserModel(String phone, String username, Timestamp createdTimestamp,String userId) {
         this.phone = phone;
         this.username = username;
+        this.searchUsername = username.toLowerCase(); // Guardar a versão em minúsculas
         this.createdTimestamp = createdTimestamp;
         this.userId = userId;
-        this.userStatus = "offline"; // Valor padrão
+        this.userStatus = "offline";
     }
 
-    // Getter e Setter para o campo atualizado
-    public String getUserStatus() {
-        return userStatus;
+    // Getter e Setter para o novo campo
+    public String getSearchUsername() {
+        return searchUsername;
     }
 
-    public void setUserStatus(String userStatus) {
-        this.userStatus = userStatus;
+    public void setSearchUsername(String searchUsername) {
+        this.searchUsername = searchUsername;
     }
 
     // Getters e Setters existentes
@@ -41,4 +43,6 @@ public class UserModel {
     public void setUserId(String userId) { this.userId = userId; }
     public String getFcmToken() { return fcmToken; }
     public void setFcmToken(String fcmToken) { this.fcmToken = fcmToken; }
+    public String getUserStatus() { return userStatus; }
+    public void setUserStatus(String userStatus) { this.userStatus = userStatus; }
 }

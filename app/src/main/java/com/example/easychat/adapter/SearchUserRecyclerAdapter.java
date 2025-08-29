@@ -20,13 +20,18 @@ import com.example.easychat.utils.FirebaseUtil;
 import com.firebase.ui.firestore.FirestoreRecyclerAdapter;
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
 
+import java.util.List;
+
 public class SearchUserRecyclerAdapter extends FirestoreRecyclerAdapter<UserModel, SearchUserRecyclerAdapter.UserModelViewHolder> {
 
     Context context;
+    List<String> contactIds; // Lista de IDs de contactos existentes
 
-    public SearchUserRecyclerAdapter(@NonNull FirestoreRecyclerOptions<UserModel> options,Context context) {
+    // Construtor atualizado para receber a lista de contactos
+    public SearchUserRecyclerAdapter(@NonNull FirestoreRecyclerOptions<UserModel> options, Context context, List<String> contactIds) {
         super(options);
         this.context = context;
+        this.contactIds = contactIds;
     }
 
     @Override
@@ -35,6 +40,13 @@ public class SearchUserRecyclerAdapter extends FirestoreRecyclerAdapter<UserMode
         holder.phoneText.setText(model.getPhone());
         if(model.getUserId().equals(FirebaseUtil.currentUserId())){
             holder.usernameText.setText(model.getUsername()+" (Me)");
+        }
+
+        // LÓGICA PARA MOSTRAR O CERTINHO
+        if (contactIds.contains(model.getUserId())) {
+            holder.checkmarkIcon.setVisibility(View.VISIBLE);
+        } else {
+            holder.checkmarkIcon.setVisibility(View.GONE);
         }
 
         FirebaseUtil.getOtherProfilePicStorageRef(model.getUserId()).getDownloadUrl()
@@ -46,7 +58,7 @@ public class SearchUserRecyclerAdapter extends FirestoreRecyclerAdapter<UserMode
                 });
 
         holder.itemView.setOnClickListener(v -> {
-            //navigate to chat activity
+            // A lógica de clique não muda, a ChatActivity já trata de conversas novas e existentes.
             Intent intent = new Intent(context, ChatActivity.class);
             AndroidUtil.passUserModelAsIntent(intent,model);
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -61,16 +73,18 @@ public class SearchUserRecyclerAdapter extends FirestoreRecyclerAdapter<UserMode
         return new UserModelViewHolder(view);
     }
 
-    class UserModelViewHolder extends RecyclerView.ViewHolder{
+    static class UserModelViewHolder extends RecyclerView.ViewHolder{
         TextView usernameText;
         TextView phoneText;
         ImageView profilePic;
+        ImageView checkmarkIcon; // Referência para o novo ícone
 
         public UserModelViewHolder(@NonNull View itemView) {
             super(itemView);
             usernameText = itemView.findViewById(R.id.user_name_text);
             phoneText = itemView.findViewById(R.id.phone_text);
             profilePic = itemView.findViewById(R.id.profile_pic_image_view);
+            checkmarkIcon = itemView.findViewById(R.id.checkmark_icon); // Inicialização
         }
     }
 }

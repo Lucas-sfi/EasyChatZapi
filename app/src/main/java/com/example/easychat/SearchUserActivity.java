@@ -9,10 +9,14 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 
 import com.example.easychat.adapter.SearchUserRecyclerAdapter;
+import com.example.easychat.model.ChatroomModel;
 import com.example.easychat.model.UserModel;
 import com.example.easychat.utils.FirebaseUtil;
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
 import com.google.firebase.firestore.Query;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class SearchUserActivity extends AppCompatActivity {
 
@@ -35,67 +39,68 @@ public class SearchUserActivity extends AppCompatActivity {
 
         searchInput.requestFocus();
 
-
-        backButton.setOnClickListener(v -> {
-            onBackPressed();
-        });
+        backButton.setOnClickListener(v -> onBackPressed());
 
         searchButton.setOnClickListener(v -> {
-            String searchTerm = searchInput.getText().toString();
-            if(searchTerm.isEmpty() || searchTerm.length()<3){
+            String searchTerm = searchInput.getText().toString().trim();
+            if(searchTerm.isEmpty() || searchTerm.length() < 3){
                 searchInput.setError("Invalid Username");
                 return;
             }
-            setupSearchRecyclerView(searchTerm);
+            getContactIdsAndSetupRecyclerView(searchTerm.toLowerCase());
         });
     }
 
-    void setupSearchRecyclerView(String searchTerm){
+    void getContactIdsAndSetupRecyclerView(String searchTerm) {
+        FirebaseUtil.allChatroomCollectionReference()
+                .whereArrayContains("userIds", FirebaseUtil.currentUserId())
+                .get()
+                .addOnSuccessListener(queryDocumentSnapshots -> {
+                    List<String> contactIds = new ArrayList<>();
+                    for (ChatroomModel chatroom : queryDocumentSnapshots.toObjects(ChatroomModel.class)) {
+                        for (String userId : chatroom.getUserIds()) {
+                            if (!userId.equals(FirebaseUtil.currentUserId())) {
+                                contactIds.add(userId);
+                            }
+                        }
+                    }
+                    setupSearchRecyclerView(searchTerm, contactIds);
+                });
+    }
 
+    void setupSearchRecyclerView(String searchTerm, List<String> contactIds){
+        // QUERY CORRIGIDA para usar o novo campo
         Query query = FirebaseUtil.allUserCollectionReference()
-                .whereGreaterThanOrEqualTo("username",searchTerm)
-                .whereLessThanOrEqualTo("username",searchTerm+'\uf8ff');
+                .whereGreaterThanOrEqualTo("searchUsername", searchTerm)
+                .whereLessThanOrEqualTo("searchUsername", searchTerm + '\uf8ff');
 
         FirestoreRecyclerOptions<UserModel> options = new FirestoreRecyclerOptions.Builder<UserModel>()
-                .setQuery(query,UserModel.class).build();
+                .setQuery(query, UserModel.class).build();
 
-        adapter = new SearchUserRecyclerAdapter(options,getApplicationContext());
+        adapter = new SearchUserRecyclerAdapter(options, getApplicationContext(), contactIds);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         recyclerView.setAdapter(adapter);
         adapter.startListening();
-
     }
 
     @Override
     protected void onStart() {
         super.onStart();
-        if(adapter!=null)
+        if(adapter != null)
             adapter.startListening();
     }
 
     @Override
     protected void onStop() {
         super.onStop();
-        if(adapter!=null)
+        if(adapter != null)
             adapter.stopListening();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        if(adapter!=null)
+        if(adapter != null)
             adapter.startListening();
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-

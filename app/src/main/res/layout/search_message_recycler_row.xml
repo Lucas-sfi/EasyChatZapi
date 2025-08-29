@@ -5,8 +5,8 @@
     android:background="@drawable/edit_text_rounded_corner"
     android:layout_margin="10dp"
     android:elevation="2dp"
-    android:gravity="center_vertical"
-    android:orientation="horizontal">
+    android:orientation="horizontal"
+    android:gravity="center_vertical">
 
     <include layout="@layout/profile_pic_view"
         android:layout_width="52dp"
@@ -16,32 +16,27 @@
         />
 
     <LinearLayout
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
         android:orientation="vertical"
         android:layout_gravity="center">
+
         <TextView
             android:id="@+id/user_name_text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="User name"
+            android:text="Chat Name"
             android:textSize="18sp"
             android:textStyle="bold"/>
+
         <TextView
-            android:id="@+id/phone_text"
+            android:id="@+id/last_message_text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="+000000000000"/>
+            android:text="This is the found message"
+            android:maxLines="1"
+            android:ellipsize="end"/>
 
     </LinearLayout>
-
-    <ImageView
-        android:id="@+id/checkmark_icon"
-        android:layout_width="32dp"
-        android:layout_height="32dp"
-        android:src="@drawable/icon_checkmark"
-        android:layout_marginEnd="10dp"
-        android:visibility="gone"/>
 
 </LinearLayout>
