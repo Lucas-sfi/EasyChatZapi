@@ -9,6 +9,8 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+
+import android.util.Patterns;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -17,6 +19,8 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
+
 import com.example.easychat.model.UserModel;
 import com.example.easychat.utils.AndroidUtil;
 import com.example.easychat.utils.FirebaseUtil;
@@ -24,6 +28,10 @@ import com.github.dhaval2404.imagepicker.ImagePicker;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.android.material.switchmaterial.SwitchMaterial;
+import com.google.firebase.auth.AuthCredential;
+import com.google.firebase.auth.EmailAuthProvider;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.messaging.FirebaseMessaging;
 import kotlin.Unit;
 import kotlin.jvm.functions.Function1;
@@ -33,8 +41,11 @@ public class ProfileFragment extends Fragment {
     ImageView profilePic;
     EditText usernameInput;
     EditText phoneInput;
-    EditText ageInput; // Novo campo
-    EditText cityInput; // Novo campo
+    EditText ageInput;
+    EditText cityInput;
+    EditText emailInput; // Novo campo
+    EditText newPasswordInput; // Novo campo
+    EditText confirmPasswordInput; // Novo campo
     Button updateProfileBtn;
     ProgressBar progressBar;
     TextView logoutBtn;
@@ -68,8 +79,11 @@ public class ProfileFragment extends Fragment {
         profilePic = view.findViewById(R.id.profile_image_view);
         usernameInput = view.findViewById(R.id.profile_username);
         phoneInput = view.findViewById(R.id.profile_phone);
-        ageInput = view.findViewById(R.id.profile_age); // Referência
-        cityInput = view.findViewById(R.id.profile_city); // Referência
+        ageInput = view.findViewById(R.id.profile_age);
+        cityInput = view.findViewById(R.id.profile_city);
+        emailInput = view.findViewById(R.id.profile_email);
+        newPasswordInput = view.findViewById(R.id.profile_new_password);
+        confirmPasswordInput = view.findViewById(R.id.profile_confirm_password);
         updateProfileBtn = view.findViewById(R.id.profle_update_btn);
         progressBar = view.findViewById(R.id.profile_progress_bar);
         logoutBtn = view.findViewById(R.id.logout_btn);
@@ -105,6 +119,9 @@ public class ProfileFragment extends Fragment {
         String newUsername = usernameInput.getText().toString();
         String newAgeStr = ageInput.getText().toString();
         String newCity = cityInput.getText().toString();
+        String newEmail = emailInput.getText().toString();
+        String newPassword = newPasswordInput.getText().toString();
+        String confirmPassword = confirmPasswordInput.getText().toString();
 
         if(newUsername.isEmpty() || newUsername.length()<3){
             usernameInput.setError("Username length should be at least 3 chars");
@@ -117,16 +134,60 @@ public class ProfileFragment extends Fragment {
         if (!newAgeStr.isEmpty()) {
             currentUserModel.setAge(Integer.parseInt(newAgeStr));
         } else {
-            currentUserModel.setAge(0); // Valor padrão se o campo estiver vazio
+            currentUserModel.setAge(0);
         }
 
         setInProgress(true);
 
-        if(selectedImageUri!=null){
-            FirebaseUtil.getCurrentProfilePicStorageRef().putFile(selectedImageUri)
-                    .addOnCompleteListener(task -> updateToFirestore());
-        }else{
-            updateToFirestore();
+        // Lógica para vincular e-mail e senha
+        if (currentUserModel.getEmail() == null && !newEmail.isEmpty()) {
+            if (!Patterns.EMAIL_ADDRESS.matcher(newEmail).matches()) {
+                emailInput.setError("E-mail inválido");
+                setInProgress(false);
+                return;
+            }
+            if (newPassword.length() < 6) {
+                newPasswordInput.setError("A senha deve ter pelo menos 6 caracteres");
+                setInProgress(false);
+                return;
+            }
+            if (!newPassword.equals(confirmPassword)) {
+                confirmPasswordInput.setError("As senhas não coincidem");
+                setInProgress(false);
+                return;
+            }
+
+            // Vincular o novo e-mail e senha à conta existente
+            FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+            if(user != null) {
+                AuthCredential credential = EmailAuthProvider.getCredential(newEmail, newPassword);
+                user.linkWithCredential(credential)
+                        .addOnCompleteListener(task -> {
+                            if (task.isSuccessful()) {
+                                currentUserModel.setEmail(newEmail);
+                                // A imagem e outros dados serão atualizados em seguida
+                                if(selectedImageUri!=null){
+                                    FirebaseUtil.getCurrentProfilePicStorageRef().putFile(selectedImageUri)
+                                            .addOnCompleteListener(imageTask -> updateToFirestore());
+                                }else{
+                                    updateToFirestore();
+                                }
+                            } else {
+                                Toast.makeText(getContext(), "Falha ao vincular e-mail: " + task.getException().getLocalizedMessage(), Toast.LENGTH_LONG).show();
+                                setInProgress(false);
+                            }
+                        });
+            } else {
+                setInProgress(false);
+            }
+        } else {
+            // Se não há um novo e-mail para vincular, apenas atualiza os outros dados
+            if(selectedImageUri!=null){
+                FirebaseUtil.getCurrentProfilePicStorageRef().putFile(selectedImageUri)
+                        .addOnCompleteListener(task -> updateToFirestore());
+            }else{
+                updateToFirestore();
+            }
         }
     }
 
@@ -161,6 +222,14 @@ public class ProfileFragment extends Fragment {
                 cityInput.setText(currentUserModel.getCity());
                 if (currentUserModel.getAge() > 0) {
                     ageInput.setText(String.valueOf(currentUserModel.getAge()));
+                }
+
+                // Preenche e desabilita o campo de e-mail se já existir
+                if (currentUserModel.getEmail() != null && !currentUserModel.getEmail().isEmpty()) {
+                    emailInput.setText(currentUserModel.getEmail());
+                    emailInput.setEnabled(false);
+                    newPasswordInput.setVisibility(View.GONE);
+                    confirmPasswordInput.setVisibility(View.GONE);
                 }
 
                 busySwitch.setChecked("busy".equals(currentUserModel.getUserStatus()));

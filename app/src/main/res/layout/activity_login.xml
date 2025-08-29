@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:layout_margin="20dp"
+    tools:context=".LoginActivity">
+
+    <ImageView
+        android:layout_width="160dp"
+        android:layout_height="160dp"
+        android:src="@drawable/chat_icon"
+        app:tint="@color/my_primary"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/app_name"
+        android:textSize="40sp"
+        android:textColor="@color/my_primary"
+        android:textStyle="bold"
+        android:fontFamily="monospace"
+        android:layout_marginTop="20dp"/>
+
+    <Button
+        android:id="@+id/login_phone_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="30dp"
+        android:text="Login com Telefone"
+        android:background="@drawable/btn_rounded_corner"
+        android:textColor="@color/white"/>
+
+    <Button
+        android:id="@+id/login_email_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="15dp"
+        android:text="Login com E-mail"
+        android:background="@drawable/btn_rounded_corner"
+        android:textColor="@color/white"/>
+
+</LinearLayout>

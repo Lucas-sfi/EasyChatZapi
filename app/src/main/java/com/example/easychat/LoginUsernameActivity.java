@@ -23,6 +23,7 @@ public class LoginUsernameActivity extends AppCompatActivity {
     Button letMeInBtn;
     ProgressBar progressBar;
     String phoneNumber;
+    String email; // Novo campo
     UserModel userModel;
 
     @Override
@@ -34,14 +35,15 @@ public class LoginUsernameActivity extends AppCompatActivity {
         letMeInBtn = findViewById(R.id.login_let_me_in_btn);
         progressBar =findViewById(R.id.login_progress_bar);
 
+        // Pega o número de telefone ou e-mail da Intent
         phoneNumber = getIntent().getExtras().getString("phone");
+        email = getIntent().getExtras().getString("email");
+
         getUsername();
 
         letMeInBtn.setOnClickListener((v -> {
             setUsername();
         }));
-
-
     }
 
     void setUsername(){
@@ -54,9 +56,14 @@ public class LoginUsernameActivity extends AppCompatActivity {
         setInProgress(true);
         if(userModel!=null){
             userModel.setUsername(username);
-            userModel.setSearchUsername(username.toLowerCase()); // Atualizar o campo de pesquisa
+            userModel.setSearchUsername(username.toLowerCase());
         }else{
-            userModel = new UserModel(phoneNumber,username, Timestamp.now(),FirebaseUtil.currentUserId());
+            // Cria o UserModel com base no que foi recebido (telefone ou e-mail)
+            if(phoneNumber != null){
+                userModel = new UserModel(phoneNumber,username, Timestamp.now(),FirebaseUtil.currentUserId());
+            } else if (email != null){
+                userModel = new UserModel(email, username, Timestamp.now(), FirebaseUtil.currentUserId(), true);
+            }
         }
 
         FirebaseUtil.currentUserDetails().set(userModel).addOnCompleteListener(new OnCompleteListener<Void>() {

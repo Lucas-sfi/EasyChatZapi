@@ -4,18 +4,20 @@ import com.google.firebase.Timestamp;
 
 public class UserModel {
     private String phone;
+    private String email; // Novo campo
     private String username;
     private String searchUsername;
     private Timestamp createdTimestamp;
     private String userId;
     private String fcmToken;
     private String userStatus;
-    private int age; // Novo campo
-    private String city; // Novo campo
+    private int age;
+    private String city;
 
     public UserModel() {
     }
 
+    // Construtor para login com telefone
     public UserModel(String phone, String username, Timestamp createdTimestamp,String userId) {
         this.phone = phone;
         this.username = username;
@@ -23,11 +25,33 @@ public class UserModel {
         this.createdTimestamp = createdTimestamp;
         this.userId = userId;
         this.userStatus = "offline";
-        this.age = 0; // Valor padrão
-        this.city = ""; // Valor padrão
+        this.age = 0;
+        this.city = "";
+        this.email = null; // Garante que o campo e-mail seja nulo
     }
 
-    // Getters e Setters para os novos campos
+    // Novo construtor para login com e-mail
+    public UserModel(String email, String username, Timestamp createdTimestamp, String userId, boolean isEmail) {
+        this.email = email;
+        this.username = username;
+        this.searchUsername = username.toLowerCase();
+        this.createdTimestamp = createdTimestamp;
+        this.userId = userId;
+        this.userStatus = "offline";
+        this.age = 0;
+        this.city = "";
+        this.phone = null; // Garante que o campo telefone seja nulo
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    // Getters e Setters existentes
     public int getAge() {
         return age;
     }
@@ -43,8 +67,6 @@ public class UserModel {
     public void setCity(String city) {
         this.city = city;
     }
-
-    // Getters e Setters existentes
     public String getPhone() { return phone; }
     public void setPhone(String phone) { this.phone = phone; }
     public String getUsername() { return username; }

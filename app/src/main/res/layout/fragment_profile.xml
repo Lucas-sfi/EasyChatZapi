@@ -1,100 +1,140 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".ProfileFragment"
-    android:orientation="vertical"
-    android:gravity="center"
-    android:layout_margin="20dp">
-
-    <ImageView
-        android:id="@+id/profile_image_view"
-        android:layout_width="160dp"
-        android:layout_height="160dp"
-        android:background="@drawable/circular_bg"
-        android:backgroundTint="@color/my_primary"
-        android:src="@drawable/person_icon"
-        android:scaleType="centerCrop"
-        android:layout_marginBottom="20dp"/>
-
-    <com.google.android.material.switchmaterial.SwitchMaterial
-        android:id="@+id/busy_switch"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Set as Busy"
-        android:textSize="18sp"
-        android:layout_marginBottom="10dp"/>
-
-    <EditText
-        android:id="@+id/profile_username"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:padding="10dp"
-        android:hint="Username"
-        android:inputType="text"
-        android:layout_margin="10dp"
-        android:background="@drawable/edit_text_rounded_corner"
-        android:elevation="5dp"/>
-
-    <EditText
-        android:id="@+id/profile_age"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:padding="10dp"
-        android:hint="Age"
-        android:inputType="number"
-        android:layout_margin="10dp"
-        android:background="@drawable/edit_text_rounded_corner"
-        android:elevation="5dp"/>
-
-    <EditText
-        android:id="@+id/profile_city"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:padding="10dp"
-        android:hint="City"
-        android:inputType="text"
-        android:layout_margin="10dp"
-        android:background="@drawable/edit_text_rounded_corner"
-        android:elevation="5dp"/>
-
-    <EditText
-        android:id="@+id/profile_phone"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:padding="10dp"
-        android:hint="Phone"
-        android:inputType="text"
-        android:layout_margin="10dp"
-        android:background="@drawable/edit_text_rounded_corner"
-        android:elevation="5dp"
-        android:enabled="false"/>
+    android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:layout_marginTop="10dp"
-        android:orientation="vertical">
-        <Button
-            android:id="@+id/profle_update_btn"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="20dp"
+        tools:context=".ProfileFragment">
+
+        <ImageView
+            android:id="@+id/profile_image_view"
+            android:layout_width="160dp"
+            android:layout_height="160dp"
+            android:background="@drawable/circular_bg"
+            android:backgroundTint="@color/my_primary"
+            android:src="@drawable/person_icon"
+            android:scaleType="centerCrop"
+            android:layout_marginBottom="20dp"/>
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/busy_switch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Set as Busy"
+            android:textSize="18sp"
+            android:layout_marginBottom="10dp"/>
+
+        <EditText
+            android:id="@+id/profile_username"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@drawable/btn_rounded_corner"
-            android:text="Update profile"/>
-        <ProgressBar
-            android:id="@+id/profile_progress_bar"
-            android:layout_width="32dp"
+            android:padding="10dp"
+            android:hint="Username"
+            android:inputType="text"
+            android:layout_margin="10dp"
+            android:background="@drawable/edit_text_rounded_corner"
+            android:elevation="5dp"/>
+
+        <EditText
+            android:id="@+id/profile_age"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:indeterminateTint="@color/my_primary"
-            android:layout_gravity="center"/>
+            android:padding="10dp"
+            android:hint="Age"
+            android:inputType="number"
+            android:layout_margin="10dp"
+            android:background="@drawable/edit_text_rounded_corner"
+            android:elevation="5dp"/>
+
+        <EditText
+            android:id="@+id/profile_city"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="10dp"
+            android:hint="City"
+            android:inputType="text"
+            android:layout_margin="10dp"
+            android:background="@drawable/edit_text_rounded_corner"
+            android:elevation="5dp"/>
+
+        <EditText
+            android:id="@+id/profile_email"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="10dp"
+            android:hint="Email"
+            android:inputType="textEmailAddress"
+            android:layout_margin="10dp"
+            android:background="@drawable/edit_text_rounded_corner"
+            android:elevation="5dp"/>
+
+        <EditText
+            android:id="@+id/profile_new_password"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="10dp"
+            android:hint="New Password"
+            android:inputType="textPassword"
+            android:layout_margin="10dp"
+            android:background="@drawable/edit_text_rounded_corner"
+            android:elevation="5dp"/>
+
+        <EditText
+            android:id="@+id/profile_confirm_password"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="10dp"
+            android:hint="Confirm New Password"
+            android:inputType="textPassword"
+            android:layout_margin="10dp"
+            android:background="@drawable/edit_text_rounded_corner"
+            android:elevation="5dp"/>
+
+        <EditText
+            android:id="@+id/profile_phone"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="10dp"
+            android:hint="Phone"
+            android:inputType="text"
+            android:layout_margin="10dp"
+            android:background="@drawable/edit_text_rounded_corner"
+            android:elevation="5dp"
+            android:enabled="false"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:layout_marginTop="10dp"
+            android:orientation="vertical">
+            <Button
+                android:id="@+id/profle_update_btn"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/btn_rounded_corner"
+                android:text="Update profile"/>
+            <ProgressBar
+                android:id="@+id/profile_progress_bar"
+                android:layout_width="32dp"
+                android:layout_height="wrap_content"
+                android:indeterminateTint="@color/my_primary"
+                android:layout_gravity="center"/>
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/logout_btn"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Logout"
+            android:layout_marginTop="10dp"/>
+
     </LinearLayout>
-
-    <TextView
-        android:id="@+id/logout_btn"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Logout"/>
-
-</LinearLayout>
+</ScrollView>
