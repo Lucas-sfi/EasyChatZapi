@@ -20,7 +20,7 @@
             android:resource="@color/my_primary"/>
 
         <activity
-            android:name=".LoginActivity"
+            android:name=".SplashActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -30,7 +30,12 @@
         </activity>
 
         <activity
-            android:name=".LoginEmailActivity"
+            android:name=".LoginActivity"
+            android:exported="false">
+        </activity>
+
+        <activity
+            android:name=".SignUpEmailActivity"
             android:exported="false">
             <meta-data
                 android:name="android.app.lib_name"
@@ -38,7 +43,7 @@
         </activity>
 
         <activity
-            android:name=".SplashActivity"
+            android:name=".LoginEmailActivity"
             android:exported="false">
             <meta-data
                 android:name="android.app.lib_name"

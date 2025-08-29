@@ -8,6 +8,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ProgressBar;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -20,9 +21,9 @@ public class LoginEmailActivity extends AppCompatActivity {
     EditText emailInput;
     EditText passwordInput;
     Button loginBtn;
-    Button signupBtn;
     ProgressBar progressBar;
     ImageButton backBtn;
+    TextView goToSignUpText;
     FirebaseAuth firebaseAuth;
 
     @Override
@@ -33,17 +34,17 @@ public class LoginEmailActivity extends AppCompatActivity {
         emailInput = findViewById(R.id.login_email);
         passwordInput = findViewById(R.id.login_password);
         loginBtn = findViewById(R.id.login_email_next_btn);
-        signupBtn = findViewById(R.id.signup_email_btn);
         progressBar = findViewById(R.id.login_progress_bar);
         backBtn = findViewById(R.id.back_btn);
+        goToSignUpText = findViewById(R.id.go_to_signup_text);
 
         firebaseAuth = FirebaseAuth.getInstance();
 
         backBtn.setOnClickListener(v -> onBackPressed());
-
         loginBtn.setOnClickListener(v -> handleLogin());
-
-        signupBtn.setOnClickListener(v -> handleSignUp());
+        goToSignUpText.setOnClickListener(v ->
+                startActivity(new Intent(LoginEmailActivity.this, SignUpEmailActivity.class))
+        );
     }
 
     void handleLogin() {
@@ -59,42 +60,18 @@ public class LoginEmailActivity extends AppCompatActivity {
                 .addOnCompleteListener(task -> {
                     setInProgress(false);
                     if (task.isSuccessful()) {
-                        // Login bem-sucedido, verificar se o usuário já tem um username
                         FirebaseUtil.currentUserDetails().get().addOnCompleteListener(docTask -> {
                             if (docTask.isSuccessful() && docTask.getResult().exists()) {
-                                // Usuário já tem dados, vai para a MainActivity
                                 Intent intent = new Intent(LoginEmailActivity.this, MainActivity.class);
                                 intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                                 startActivity(intent);
                             } else {
-                                // Novo usuário ou usuário sem username, vai para a tela de username
                                 Intent intent = new Intent(LoginEmailActivity.this, LoginUsernameActivity.class);
                                 intent.putExtra("email", email);
                                 startActivity(intent);
                             }
                             finish();
                         });
-                    } else {
-                        Toast.makeText(this, task.getException().getLocalizedMessage(), Toast.LENGTH_SHORT).show();
-                    }
-                });
-    }
-
-    void handleSignUp() {
-        String email = emailInput.getText().toString();
-        String password = passwordInput.getText().toString();
-
-        if (!validateData(email, password)) {
-            return;
-        }
-
-        setInProgress(true);
-        firebaseAuth.createUserWithEmailAndPassword(email, password)
-                .addOnCompleteListener(task -> {
-                    setInProgress(false);
-                    if (task.isSuccessful()) {
-                        Toast.makeText(this, "Cadastro realizado com sucesso! Faça o login.", Toast.LENGTH_LONG).show();
-                        firebaseAuth.signOut(); // Desloga para o usuário fazer o login manualmente
                     } else {
                         Toast.makeText(this, task.getException().getLocalizedMessage(), Toast.LENGTH_SHORT).show();
                     }
@@ -117,11 +94,11 @@ public class LoginEmailActivity extends AppCompatActivity {
         if (inProgress) {
             progressBar.setVisibility(View.VISIBLE);
             loginBtn.setVisibility(View.GONE);
-            signupBtn.setVisibility(View.GONE);
+            goToSignUpText.setVisibility(View.GONE);
         } else {
             progressBar.setVisibility(View.GONE);
             loginBtn.setVisibility(View.VISIBLE);
-            signupBtn.setVisibility(View.VISIBLE);
+            goToSignUpText.setVisibility(View.VISIBLE);
         }
     }
 }

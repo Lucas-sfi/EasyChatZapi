@@ -37,7 +37,23 @@ public class SearchUserRecyclerAdapter extends FirestoreRecyclerAdapter<UserMode
     @Override
     protected void onBindViewHolder(@NonNull UserModelViewHolder holder, int position, @NonNull UserModel model) {
         holder.usernameText.setText(model.getUsername());
-        holder.phoneText.setText(model.getPhone());
+
+        // Lógica para exibir telefone
+        if(model.getPhone() != null && !model.getPhone().isEmpty()){
+            holder.phoneText.setText(model.getPhone());
+            holder.phoneText.setVisibility(View.VISIBLE);
+        } else {
+            holder.phoneText.setVisibility(View.GONE);
+        }
+
+        // Lógica para exibir e-mail
+        if(model.getEmail() != null && !model.getEmail().isEmpty()){
+            holder.emailText.setText(model.getEmail());
+            holder.emailText.setVisibility(View.VISIBLE);
+        } else {
+            holder.emailText.setVisibility(View.GONE);
+        }
+
         if(model.getUserId().equals(FirebaseUtil.currentUserId())){
             holder.usernameText.setText(model.getUsername()+" (Me)");
         }
@@ -76,15 +92,17 @@ public class SearchUserRecyclerAdapter extends FirestoreRecyclerAdapter<UserMode
     static class UserModelViewHolder extends RecyclerView.ViewHolder{
         TextView usernameText;
         TextView phoneText;
+        TextView emailText; // Novo campo
         ImageView profilePic;
-        ImageView checkmarkIcon; // Referência para o novo ícone
+        ImageView checkmarkIcon;
 
         public UserModelViewHolder(@NonNull View itemView) {
             super(itemView);
             usernameText = itemView.findViewById(R.id.user_name_text);
             phoneText = itemView.findViewById(R.id.phone_text);
+            emailText = itemView.findViewById(R.id.email_text); // Inicialização
             profilePic = itemView.findViewById(R.id.profile_pic_image_view);
-            checkmarkIcon = itemView.findViewById(R.id.checkmark_icon); // Inicialização
+            checkmarkIcon = itemView.findViewById(R.id.checkmark_icon);
         }
     }
 }
