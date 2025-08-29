@@ -59,6 +59,14 @@
             android:textSize="24sp"
             android:textStyle="bold" />
 
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/notification_switch"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Custom Notifications"
+            android:textSize="18sp"
+            android:layout_marginTop="20dp"/>
+
         <Button
             android:id="@+id/add_member_btn"
             android:layout_width="match_parent"

@@ -17,9 +17,11 @@ import android.widget.Toast;
 import com.example.easychat.adapter.GroupMemberRecyclerAdapter;
 import com.example.easychat.model.ChatroomModel;
 import com.example.easychat.utils.FirebaseUtil;
+import com.google.android.material.switchmaterial.SwitchMaterial;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class GroupSettingsActivity extends AppCompatActivity {
 
@@ -30,7 +32,8 @@ public class GroupSettingsActivity extends AppCompatActivity {
     private RecyclerView membersRecyclerView;
     private GroupMemberRecyclerAdapter adapter;
     private Button addMemberBtn;
-    private Button leaveGroupBtn; // Novo botão
+    private Button leaveGroupBtn;
+    private SwitchMaterial notificationSwitch; // Novo Switch
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -41,7 +44,8 @@ public class GroupSettingsActivity extends AppCompatActivity {
         groupNameView = findViewById(R.id.group_name_view);
         membersRecyclerView = findViewById(R.id.members_recycler_view);
         addMemberBtn = findViewById(R.id.add_member_btn);
-        leaveGroupBtn = findViewById(R.id.leave_group_btn); // Referência do novo botão
+        leaveGroupBtn = findViewById(R.id.leave_group_btn);
+        notificationSwitch = findViewById(R.id.notification_switch); // Referência
 
         chatroomId = getIntent().getStringExtra("chatroomId");
 
@@ -55,7 +59,6 @@ public class GroupSettingsActivity extends AppCompatActivity {
             startActivity(intent);
         });
 
-        // Listener para o novo botão
         leaveGroupBtn.setOnClickListener(v -> showLeaveGroupDialog());
 
         getGroupDetails();
@@ -71,9 +74,30 @@ public class GroupSettingsActivity extends AppCompatActivity {
                 if (chatroomModel != null) {
                     groupNameView.setText(chatroomModel.getGroupName());
                     setupMembersRecyclerView();
+                    setupNotificationSwitch(); // Configurar o Switch
                 }
             }
         });
+    }
+
+    private void setupNotificationSwitch() {
+        boolean isEnabled = chatroomModel.getCustomNotificationStatus()
+                .getOrDefault(FirebaseUtil.currentUserId(), false);
+        notificationSwitch.setChecked(isEnabled);
+
+        notificationSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            updateNotificationStatus(isChecked);
+        });
+    }
+
+    private void updateNotificationStatus(boolean isEnabled) {
+        if (chatroomModel != null) {
+            Map<String, Boolean> statusMap = chatroomModel.getCustomNotificationStatus();
+            statusMap.put(FirebaseUtil.currentUserId(), isEnabled);
+            chatroomModel.setCustomNotificationStatus(statusMap);
+
+            FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel);
+        }
     }
 
     private void setupMembersRecyclerView() {
@@ -113,19 +137,15 @@ public class GroupSettingsActivity extends AppCompatActivity {
         builder.show();
     }
 
-    // Nova função para o diálogo de confirmação
     private void showLeaveGroupDialog() {
         new AlertDialog.Builder(this)
                 .setTitle("Leave Group")
                 .setMessage("Are you sure you want to leave this group?")
-                .setPositiveButton("Leave", (dialog, which) -> {
-                    leaveGroup();
-                })
+                .setPositiveButton("Leave", (dialog, which) -> leaveGroup())
                 .setNegativeButton("Cancel", null)
                 .show();
     }
 
-    // Nova função para a lógica de sair do grupo
     private void leaveGroup() {
         if (chatroomModel != null) {
             List<String> updatedUserIds = chatroomModel.getUserIds();

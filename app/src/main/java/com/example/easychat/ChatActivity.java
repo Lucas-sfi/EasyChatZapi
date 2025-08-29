@@ -75,11 +75,9 @@ public class ChatActivity extends AppCompatActivity {
 
         backBtn.setOnClickListener(v -> onBackPressed());
 
-        // AQUI ESTÁ A CORREÇÃO
         otherUser = AndroidUtil.getUserModelFromIntent(getIntent());
         chatroomId = getIntent().getStringExtra("chatroomId");
 
-        // Se o chatroomId for nulo, significa que estamos vindo da tela de busca para criar um novo chat.
         if (chatroomId == null && otherUser != null) {
             chatroomId = FirebaseUtil.getChatroomId(FirebaseUtil.currentUserId(), otherUser.getUserId());
         }
@@ -93,11 +91,33 @@ public class ChatActivity extends AppCompatActivity {
         });
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        markMessagesAsRead();
+    }
+
+    private void markMessagesAsRead() {
+        // Apenas marcar como lido para conversas individuais
+        if (chatroomModel != null && !chatroomModel.isGroupChat() && otherUser != null) {
+            FirebaseUtil.getChatroomMessageReference(chatroomId)
+                    .whereEqualTo("senderId", otherUser.getUserId())
+                    .whereEqualTo("status", ChatMessageModel.STATUS_SENT)
+                    .get()
+                    .addOnCompleteListener(task -> {
+                        if (task.isSuccessful() && task.getResult() != null) {
+                            for (DocumentSnapshot document : task.getResult().getDocuments()) {
+                                document.getReference().update("status", ChatMessageModel.STATUS_READ);
+                            }
+                        }
+                    });
+        }
+    }
+
     private void getChatroomData() {
         FirebaseUtil.getChatroomReference(chatroomId).get().addOnCompleteListener(task -> {
             if (task.isSuccessful()) {
                 chatroomModel = task.getResult().toObject(ChatroomModel.class);
-                // Se o chatroom não existir, criamos um novo (apenas para chats individuais)
                 if (chatroomModel == null && !FirebaseUtil.isGroupChat(chatroomId)) {
                     chatroomModel = new ChatroomModel(
                             chatroomId,
@@ -120,7 +140,6 @@ public class ChatActivity extends AppCompatActivity {
 
     private void updateUI() {
         if (chatroomModel == null) return;
-
         if (chatroomModel.isGroupChat()) {
             toolbarTitle.setText(chatroomModel.getGroupName());
             toolbarProfilePic.setImageResource(R.drawable.chat_icon);
@@ -152,17 +171,14 @@ public class ChatActivity extends AppCompatActivity {
     private void setupChatRecyclerView() {
         Query query = FirebaseUtil.getChatroomMessageReference(chatroomId)
                 .orderBy("timestamp", Query.Direction.DESCENDING);
-
         FirestoreRecyclerOptions<ChatMessageModel> options = new FirestoreRecyclerOptions.Builder<ChatMessageModel>()
                 .setQuery(query, ChatMessageModel.class).build();
-
         adapter = new ChatRecyclerAdapter(options, getApplicationContext());
         LinearLayoutManager manager = new LinearLayoutManager(this);
         manager.setReverseLayout(true);
         recyclerView.setLayoutManager(manager);
         recyclerView.setAdapter(adapter);
         adapter.startListening();
-
         adapter.registerAdapterDataObserver(new RecyclerView.AdapterDataObserver() {
             @Override
             public void onItemRangeInserted(int positionStart, int itemCount) {
@@ -174,12 +190,10 @@ public class ChatActivity extends AppCompatActivity {
 
     private void sendMessage(String message) {
         if (chatroomModel == null) return;
-
         chatroomModel.setLastMessageTimestamp(Timestamp.now());
         chatroomModel.setLastMessageSenderId(FirebaseUtil.currentUserId());
         chatroomModel.setLastMessage(message);
         FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel);
-
         ChatMessageModel chatMessageModel = new ChatMessageModel(message, FirebaseUtil.currentUserId(), Timestamp.now(), ChatMessageModel.STATUS_SENT);
         FirebaseUtil.getChatroomMessageReference(chatroomId).add(chatMessageModel)
                 .addOnCompleteListener(task -> {
@@ -192,6 +206,7 @@ public class ChatActivity extends AppCompatActivity {
                 });
     }
 
+    // As funções sendNotification e callApi continuam iguais
     void sendNotification(String message) {
         if (otherUser == null || otherUser.getFcmToken() == null) return;
         FirebaseUtil.currentUserDetails().get().addOnCompleteListener(task -> {

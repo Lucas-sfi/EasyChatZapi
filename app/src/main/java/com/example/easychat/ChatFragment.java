@@ -21,7 +21,6 @@ public class ChatFragment extends Fragment {
     RecyclerView recyclerView;
     RecentChatRecyclerAdapter adapter;
 
-
     public ChatFragment() {
     }
     @Override
