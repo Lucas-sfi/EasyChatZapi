@@ -82,16 +82,38 @@ public class SelectGroupMembersActivity extends AppCompatActivity {
     }
 
     private void setupRecyclerView() {
-        Query query = FirebaseUtil.allUserCollectionReference()
-                .whereNotEqualTo("userId", FirebaseUtil.currentUserId());
+        FirebaseUtil.allChatroomCollectionReference()
+                .whereArrayContains("userIds", FirebaseUtil.currentUserId())
+                .get().addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        List<String> contactIds = new ArrayList<>();
+                        for (ChatroomModel chatroom : task.getResult().toObjects(ChatroomModel.class)) {
+                            if (!chatroom.isGroupChat()) {
+                                for (String userId : chatroom.getUserIds()) {
+                                    if (!userId.equals(FirebaseUtil.currentUserId())) {
+                                        contactIds.add(userId);
+                                    }
+                                }
+                            }
+                        }
 
-        FirestoreRecyclerOptions<UserModel> options = new FirestoreRecyclerOptions.Builder<UserModel>()
-                .setQuery(query, UserModel.class).build();
+                        if (!contactIds.isEmpty()) {
+                            Query query = FirebaseUtil.allUserCollectionReference()
+                                    .whereIn("userId", contactIds);
 
-        // Passar os membros atuais para o adapter
-        adapter = new SelectUserRecyclerAdapter(options, getApplicationContext(), currentMembers);
-        recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        recyclerView.setAdapter(adapter);
+                            FirestoreRecyclerOptions<UserModel> options = new FirestoreRecyclerOptions.Builder<UserModel>()
+                                    .setQuery(query, UserModel.class).build();
+
+                            adapter = new SelectUserRecyclerAdapter(options, getApplicationContext(), currentMembers);
+                            recyclerView.setLayoutManager(new LinearLayoutManager(this));
+                            recyclerView.setAdapter(adapter);
+                            adapter.startListening();
+                        } else {
+                            // Opcional: Mostrar uma mensagem se o usuário não tiver contatos
+                            Toast.makeText(this, "Você não tem contatos para adicionar.", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                });
     }
 
     @Override
