@@ -1,18 +1,14 @@
 package com.example.easychat;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
-
 import com.example.easychat.model.UserModel;
 import com.example.easychat.utils.AndroidUtil;
 import com.example.easychat.utils.FirebaseUtil;
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.Task;
-import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 
 public class SplashActivity extends AppCompatActivity {
 
@@ -21,39 +17,35 @@ public class SplashActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_splash);
 
-        if(getIntent().getExtras()!=null){
-            //from notification
+        if (getIntent().getExtras() != null && getIntent().getExtras().getString("userId") != null) {
             String userId = getIntent().getExtras().getString("userId");
             FirebaseUtil.allUserCollectionReference().document(userId).get()
                     .addOnCompleteListener(task -> {
-                        if(task.isSuccessful()){
+                        if (task.isSuccessful()) {
                             UserModel model = task.getResult().toObject(UserModel.class);
+                            if (model != null) {
+                                Intent mainIntent = new Intent(this, MainActivity.class);
+                                mainIntent.setFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
+                                startActivity(mainIntent);
 
-                            Intent mainIntent = new Intent(this,MainActivity.class);
-                            mainIntent.setFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
-                            startActivity(mainIntent);
-
-                            Intent intent = new Intent(this, ChatActivity.class);
-                            AndroidUtil.passUserModelAsIntent(intent,model);
-                            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                            startActivity(intent);
-                            finish();
+                                Intent chatIntent = new Intent(this, ChatActivity.class);
+                                AndroidUtil.passUserModelAsIntent(chatIntent, model);
+                                chatIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                startActivity(chatIntent);
+                                finish();
+                            }
                         }
                     });
-
-
-        }else{
-            new Handler().postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    if(FirebaseUtil.isLoggedIn()){
-                        startActivity(new Intent(SplashActivity.this,MainActivity.class));
-                    }else{
-                        startActivity(new Intent(SplashActivity.this,LoginActivity.class));
-                    }
-                    finish();
+        } else {
+            new Handler().postDelayed(() -> {
+                FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+                if (currentUser != null) {
+                    startActivity(new Intent(SplashActivity.this, MainActivity.class));
+                } else {
+                    startActivity(new Intent(SplashActivity.this, LoginActivity.class));
                 }
-            },1000);
+                finish();
+            }, 1500); // Aumentado para 1.5 segundos para garantir a inicialização
         }
     }
 }

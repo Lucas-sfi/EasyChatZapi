@@ -20,6 +20,14 @@
             android:resource="@color/my_primary"/>
 
         <activity
+            android:name=".SelectBroadcastContactsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ComposeBroadcastActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".SplashActivity"
             android:exported="true">
             <intent-filter>

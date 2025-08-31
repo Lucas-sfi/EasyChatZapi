@@ -302,6 +302,7 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
 
     void uploadImageToFirebase() {
         if (selectedImageUri == null) return;
+        Toast.makeText(this, "Enviando imagem...", Toast.LENGTH_SHORT).show();
         String imageId = "img_" + System.currentTimeMillis();
         StorageReference storageRef = FirebaseStorage.getInstance().getReference().child("chat_images").child(chatroomId).child(imageId);
 
@@ -312,7 +313,7 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
                     });
                 })
                 .addOnFailureListener(e -> {
-                    Toast.makeText(this, "Failed to upload image", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Falha ao enviar imagem", Toast.LENGTH_SHORT).show();
                 });
     }
 
@@ -320,7 +321,7 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
         if (chatroomModel == null) return;
         chatroomModel.setLastMessageTimestamp(Timestamp.now());
         chatroomModel.setLastMessageSenderId(FirebaseUtil.currentUserId());
-        chatroomModel.setLastMessage("Sent an image");
+        chatroomModel.setLastMessage("Imagem");
         FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel);
 
         ChatMessageModel chatMessageModel = new ChatMessageModel(imageUrl, FirebaseUtil.currentUserId(), Timestamp.now(), ChatMessageModel.STATUS_SENT, new ArrayList<>(), "image");

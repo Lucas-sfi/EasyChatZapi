@@ -1,7 +1,6 @@
 package com.example.easychat.adapter;
 
 import android.content.Context;
-import android.content.DialogInterface;
 import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -13,6 +12,8 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
+
+import com.bumptech.glide.Glide;
 import com.example.easychat.R;
 import com.example.easychat.model.ChatMessageModel;
 import com.example.easychat.utils.FirebaseUtil;
@@ -23,7 +24,7 @@ public class ChatRecyclerAdapter extends FirestoreRecyclerAdapter<ChatMessageMod
 
     Context context;
     private String highlightedMessageId = null;
-    private PinMessageListener pinMessageListener; // Interface para comunicar com a Activity
+    private PinMessageListener pinMessageListener;
 
     public ChatRecyclerAdapter(@NonNull FirestoreRecyclerOptions<ChatMessageModel> options, Context context, PinMessageListener listener) {
         super(options);
@@ -41,10 +42,22 @@ public class ChatRecyclerAdapter extends FirestoreRecyclerAdapter<ChatMessageMod
             holder.itemView.setBackgroundColor(Color.TRANSPARENT);
         }
 
+        // Lógica para exibir a mensagem correta (texto ou imagem)
+        boolean isImage = "image".equals(model.getType());
+
         if (model.getSenderId().equals(FirebaseUtil.currentUserId())) {
             holder.leftChatLayout.setVisibility(View.GONE);
             holder.rightChatLayout.setVisibility(View.VISIBLE);
-            holder.rightChatTextview.setText(model.getMessage());
+
+            if (isImage) {
+                holder.rightChatTextview.setVisibility(View.GONE);
+                holder.rightChatImageView.setVisibility(View.VISIBLE);
+                Glide.with(context).load(model.getMessage()).into(holder.rightChatImageView);
+            } else {
+                holder.rightChatImageView.setVisibility(View.GONE);
+                holder.rightChatTextview.setVisibility(View.VISIBLE);
+                holder.rightChatTextview.setText(model.getMessage());
+            }
 
             if (model.getStatus() == ChatMessageModel.STATUS_READ) {
                 holder.statusIcon.setImageResource(R.drawable.ic_status_read);
@@ -57,10 +70,18 @@ public class ChatRecyclerAdapter extends FirestoreRecyclerAdapter<ChatMessageMod
         } else {
             holder.rightChatLayout.setVisibility(View.GONE);
             holder.leftChatLayout.setVisibility(View.VISIBLE);
-            holder.leftChatTextview.setText(model.getMessage());
+
+            if (isImage) {
+                holder.leftChatTextview.setVisibility(View.GONE);
+                holder.leftChatImageView.setVisibility(View.VISIBLE);
+                Glide.with(context).load(model.getMessage()).into(holder.leftChatImageView);
+            } else {
+                holder.leftChatImageView.setVisibility(View.GONE);
+                holder.leftChatTextview.setVisibility(View.VISIBLE);
+                holder.leftChatTextview.setText(model.getMessage());
+            }
         }
 
-        // Listener para clique longo na mensagem
         holder.itemView.setOnLongClickListener(v -> {
             showPinMessageDialog(currentMessageId);
             return true;
@@ -92,6 +113,7 @@ public class ChatRecyclerAdapter extends FirestoreRecyclerAdapter<ChatMessageMod
     static class ChatModelViewHolder extends RecyclerView.ViewHolder {
         LinearLayout leftChatLayout, rightChatLayout;
         TextView leftChatTextview, rightChatTextview;
+        ImageView leftChatImageView, rightChatImageView; // Referências para as imagens
         ImageView statusIcon;
 
         public ChatModelViewHolder(@NonNull View itemView) {
@@ -100,11 +122,12 @@ public class ChatRecyclerAdapter extends FirestoreRecyclerAdapter<ChatMessageMod
             rightChatLayout = itemView.findViewById(R.id.right_chat_layout);
             leftChatTextview = itemView.findViewById(R.id.left_chat_textview);
             rightChatTextview = itemView.findViewById(R.id.right_chat_textview);
+            leftChatImageView = itemView.findViewById(R.id.left_chat_imageview);
+            rightChatImageView = itemView.findViewById(R.id.right_chat_imageview);
             statusIcon = itemView.findViewById(R.id.message_status_icon);
         }
     }
 
-    // Interface para comunicar a ação de fixar
     public interface PinMessageListener {
         void onPinMessageClicked(String messageId);
     }

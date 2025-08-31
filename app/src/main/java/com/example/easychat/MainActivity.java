@@ -27,6 +27,7 @@ public class MainActivity extends AppCompatActivity {
     BottomNavigationView bottomNavigationView;
     ImageButton addUserBtn;
     ImageButton searchMessageBtn;
+    ImageButton broadcastBtn; // Novo Botão
     FloatingActionButton addNewChatBtn;
 
     ChatFragment chatFragment;
@@ -43,6 +44,7 @@ public class MainActivity extends AppCompatActivity {
         bottomNavigationView = findViewById(R.id.bottom_navigation);
         addUserBtn = findViewById(R.id.main_add_user_btn);
         searchMessageBtn = findViewById(R.id.main_search_message_btn);
+        broadcastBtn = findViewById(R.id.main_broadcast_btn); // Referência
         addNewChatBtn = findViewById(R.id.main_add_new_chat_btn);
 
         addUserBtn.setOnClickListener((v)->{
@@ -51,6 +53,11 @@ public class MainActivity extends AppCompatActivity {
 
         searchMessageBtn.setOnClickListener(v -> {
             startActivity(new Intent(MainActivity.this, SearchMessageActivity.class));
+        });
+
+        // Lógica para o novo botão de transmissão
+        broadcastBtn.setOnClickListener(v -> {
+            startActivity(new Intent(MainActivity.this, SelectBroadcastContactsActivity.class));
         });
 
         addNewChatBtn.setOnClickListener((v) -> {
@@ -70,7 +77,6 @@ public class MainActivity extends AppCompatActivity {
 
         getFCMToken();
 
-        // CHAME A FUNÇÃO DE MIGRAÇÃO AQUI (APENAS UMA VEZ!)
         migrateMessagesData();
     }
 
@@ -103,7 +109,6 @@ public class MainActivity extends AppCompatActivity {
                                         if (message != null) {
                                             String messageText = message.getMessage();
                                             List<String> newKeywords = generateKeywordsForMigration(messageText);
-                                            // Apenas atualiza se as keywords forem diferentes (para evitar escritas desnecessárias)
                                             if (!newKeywords.equals(message.getSearchKeywords())) {
                                                 messageDoc.getReference().update("searchKeywords", newKeywords)
                                                         .addOnSuccessListener(aVoid -> Log.d("MsgMigration", "Message prefixes updated: " + messageDoc.getId()))

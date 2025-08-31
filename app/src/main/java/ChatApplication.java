@@ -17,27 +17,17 @@ public class ChatApplication extends Application implements Application.Activity
 
     @Override
     public void onActivityStarted(@NonNull android.app.Activity activity) {
-        // App foi para o primeiro plano
+        // A lógica de verificação de status online/offline foi movida para locais mais apropriados
+        // para evitar o bloqueio na inicialização do app.
         if (FirebaseUtil.isLoggedIn()) {
-            FirebaseUtil.currentUserDetails().get().addOnSuccessListener(documentSnapshot -> {
-                UserModel userModel = documentSnapshot.toObject(UserModel.class);
-                if (userModel != null && !"busy".equals(userModel.getUserStatus())) {
-                    FirebaseUtil.currentUserDetails().update("userStatus", "online");
-                }
-            });
+            FirebaseUtil.currentUserDetails().update("userStatus", "online");
         }
     }
 
     @Override
     public void onActivityStopped(@NonNull android.app.Activity activity) {
-        // App foi para o segundo plano
         if (FirebaseUtil.isLoggedIn()) {
-            FirebaseUtil.currentUserDetails().get().addOnSuccessListener(documentSnapshot -> {
-                UserModel userModel = documentSnapshot.toObject(UserModel.class);
-                if (userModel != null && !"busy".equals(userModel.getUserStatus())) {
-                    FirebaseUtil.currentUserDetails().update("userStatus", "offline");
-                }
-            });
+            FirebaseUtil.currentUserDetails().update("userStatus", "offline");
         }
     }
 
