@@ -9,15 +9,16 @@ public class ChatMessageModel {
     private Timestamp timestamp;
     private int status;
     private List<String> searchKeywords;
-    private String type; // Novo campo: "text" ou "image"
+    private String type; // Campo crucial: "text" ou "image"
 
     public static final int STATUS_SENT = 0;
     public static final int STATUS_READ = 1;
 
     public ChatMessageModel() {
+        // Construtor vazio necessário para o Firebase
     }
 
-    // Construtor atualizado
+    // Construtor para criar mensagens
     public ChatMessageModel(String message, String senderId, Timestamp timestamp, int status, List<String> searchKeywords, String type) {
         this.message = message;
         this.senderId = senderId;
@@ -27,7 +28,7 @@ public class ChatMessageModel {
         this.type = type;
     }
 
-    // Getter e Setter para o novo campo
+    // Getters e Setters
     public String getType() {
         return type;
     }
@@ -36,7 +37,6 @@ public class ChatMessageModel {
         this.type = type;
     }
 
-    // Getters e Setters existentes
     public List<String> getSearchKeywords() { return searchKeywords; }
     public void setSearchKeywords(List<String> searchKeywords) { this.searchKeywords = searchKeywords; }
     public String getMessage() { return message; }

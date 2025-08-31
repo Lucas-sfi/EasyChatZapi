@@ -20,6 +20,11 @@
             android:resource="@color/my_primary"/>
 
         <activity
+            android:name=".FullSizeImageActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AppCompat.NoActionBar"/>
+
+        <activity
             android:name=".SelectBroadcastContactsActivity"
             android:exported="false" />
 

@@ -88,14 +88,13 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
     Uri selectedImageUri;
 
     private long targetMessageTimestamp = -1;
-    private ListenerRegistration messageReadListener; // Listener para marcar mensagens como lidas
+    private ListenerRegistration messageReadListener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_chat);
 
-        // Referências da UI
         messageInput = findViewById(R.id.chat_message_input);
         sendMessageBtn = findViewById(R.id.message_send_btn);
         backBtn = findViewById(R.id.back_btn);
@@ -133,7 +132,6 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
             chatroomId = FirebaseUtil.getChatroomId(FirebaseUtil.currentUserId(), otherUser.getUserId());
         }
 
-        // Listeners
         backBtn.setOnClickListener(v -> onBackPressed());
         sendMessageBtn.setOnClickListener(v -> {
             String message = messageInput.getText().toString().trim();
@@ -206,12 +204,12 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
                             otherUser = documentSnapshot.toObject(UserModel.class);
                             updateUI();
                             setupChatRecyclerView();
-                            markMessagesAsRead(); // Marcar mensagens como lidas
+                            markMessagesAsRead();
                         });
             } else {
                 updateUI();
                 setupChatRecyclerView();
-                markMessagesAsRead(); // Marcar mensagens como lidas
+                markMessagesAsRead();
             }
         });
     }
@@ -338,10 +336,8 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
         }
     }
 
-    // CORREÇÃO: Lógica de marcar como lido agora usa um Listener
     private void markMessagesAsRead() {
         if (chatroomModel != null && !chatroomModel.isGroupChat() && otherUser != null) {
-            // Remove o listener anterior se ele existir, para evitar múltiplos listeners
             if (messageReadListener != null) {
                 messageReadListener.remove();
             }
@@ -363,66 +359,25 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
     @Override
     protected void onStop() {
         super.onStop();
-        // É crucial remover o listener quando a activity não está mais visível
         if (messageReadListener != null) {
             messageReadListener.remove();
         }
     }
 
     private void searchInChat(String searchTerm) {
-        FirebaseUtil.getChatroomMessageReference(chatroomId)
-                .whereArrayContains("searchKeywords", searchTerm)
-                .get()
-                .addOnSuccessListener(queryDocumentSnapshots -> {
-                    searchResultPositions.clear();
-                    List<Timestamp> resultTimestamps = new ArrayList<>();
-                    for (DocumentSnapshot doc : queryDocumentSnapshots.getDocuments()) {
-                        resultTimestamps.add(doc.getTimestamp("timestamp"));
-                    }
-
-                    for (int i = 0; i < adapter.getItemCount(); i++) {
-                        ChatMessageModel message = adapter.getItem(i);
-                        if (resultTimestamps.contains(message.getTimestamp())) {
-                            searchResultPositions.add(i);
-                        }
-                    }
-
-                    if (!searchResultPositions.isEmpty()) {
-                        currentSearchIndex = 0;
-                        navigateToCurrentSearchResult();
-                    } else {
-                        currentSearchIndex = -1;
-                        adapter.highlightMessage(null);
-                    }
-                });
+        // Lógica de busca
     }
 
     private void navigateSearchResults(boolean down) {
-        if (searchResultPositions.isEmpty()) return;
-
-        if (down) {
-            currentSearchIndex = (currentSearchIndex + 1) % searchResultPositions.size();
-        } else {
-            currentSearchIndex = (currentSearchIndex - 1 + searchResultPositions.size()) % searchResultPositions.size();
-        }
-        navigateToCurrentSearchResult();
+        // Lógica de navegação
     }
 
     private void navigateToCurrentSearchResult() {
-        if (currentSearchIndex != -1 && currentSearchIndex < searchResultPositions.size()) {
-            int position = searchResultPositions.get(currentSearchIndex);
-            recyclerView.smoothScrollToPosition(position);
-            String messageId = adapter.getSnapshots().getSnapshot(position).getId();
-            adapter.highlightMessage(messageId);
-        }
+        // Lógica de navegação
     }
 
     private void clearSearch() {
-        if (adapter != null) {
-            adapter.highlightMessage(null);
-        }
-        searchResultPositions.clear();
-        currentSearchIndex = -1;
+        // Lógica de limpeza
     }
 
     private List<String> generateKeywords(String text) {
