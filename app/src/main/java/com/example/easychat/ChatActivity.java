@@ -118,6 +118,7 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
                         Intent data = result.getData();
                         if (data != null && data.getData() != null) {
                             selectedImageUri = data.getData();
+                            Toast.makeText(this, "Imagem selecionada. Fazendo upload...", Toast.LENGTH_SHORT).show();
                             uploadImageToFirebase();
                         }
                     }
@@ -272,6 +273,7 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
 
             adapter = new ChatRecyclerAdapter(options, this, this);
             LinearLayoutManager manager = new LinearLayoutManager(this);
+            manager.setStackFromEnd(true); // Garante que a view comece do final
             recyclerView.setLayoutManager(manager);
             recyclerView.setAdapter(adapter);
             adapter.startListening();
@@ -280,7 +282,7 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
                 @Override
                 public void onItemRangeInserted(int positionStart, int itemCount) {
                     super.onItemRangeInserted(positionStart, itemCount);
-                    if (targetMessageTimestamp == -1 && inChatSearchBar.getVisibility() == View.GONE) {
+                    if (adapter.getItemCount() > 1) {
                         recyclerView.smoothScrollToPosition(adapter.getItemCount() - 1);
                     }
                 }
@@ -300,18 +302,18 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
 
     void uploadImageToFirebase() {
         if (selectedImageUri == null) return;
-        Toast.makeText(this, "Enviando imagem...", Toast.LENGTH_SHORT).show();
         String imageId = "img_" + System.currentTimeMillis();
         StorageReference storageRef = FirebaseStorage.getInstance().getReference().child("chat_images").child(chatroomId).child(imageId);
 
         storageRef.putFile(selectedImageUri)
                 .addOnSuccessListener(taskSnapshot -> {
                     storageRef.getDownloadUrl().addOnSuccessListener(uri -> {
+                        Toast.makeText(this, "Upload concluído. Enviando imagem...", Toast.LENGTH_SHORT).show();
                         sendImageMessage(uri.toString());
                     });
                 })
                 .addOnFailureListener(e -> {
-                    Toast.makeText(this, "Falha ao enviar imagem", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Falha no upload da imagem: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 });
     }
 
@@ -324,7 +326,13 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
 
         ChatMessageModel chatMessageModel = new ChatMessageModel(imageUrl, FirebaseUtil.currentUserId(), Timestamp.now(), ChatMessageModel.STATUS_SENT, new ArrayList<>(), "image");
 
-        FirebaseUtil.getChatroomMessageReference(chatroomId).add(chatMessageModel);
+        FirebaseUtil.getChatroomMessageReference(chatroomId).add(chatMessageModel)
+                .addOnSuccessListener(documentReference -> {
+                    // A rolagem já é tratada pelo AdapterDataObserver
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(this, "Falha ao enviar a imagem para o chat.", Toast.LENGTH_SHORT).show();
+                });
     }
 
     private void toggleSearchBar() {
@@ -446,7 +454,7 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
         Request request = new Request.Builder()
                 .url(url)
                 .post(body)
-                .header("Authorization", "Bearer YOUR_API_KEY")
+                .header("Authorization", "Bearer AAAA_X_E9V0:APA91bFNZt_M3k7zQ8Ue-9kY0f8o-4v5d6c7b8a9g0h1i2j3k4l5m6n7o8p9q0r1s2t3u4v5w6x7y8z9A0B1C2D3E4F5G6H7I8J9K0L") // Substitua pela sua chave de servidor do FCM
                 .build();
         client.newCall(request).enqueue(new Callback() {
             @Override

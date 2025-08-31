@@ -64,14 +64,20 @@ public class ChatRecyclerAdapter extends FirestoreRecyclerAdapter<ChatMessageMod
                 holder.rightChatTextview.setText(model.getMessage());
             }
 
-            // Lógica do status da mensagem
-            if (model.getStatus() == ChatMessageModel.STATUS_READ) {
-                holder.statusIcon.setImageResource(R.drawable.ic_status_read);
-                holder.statusIcon.setColorFilter(ContextCompat.getColor(context, R.color.my_secondary));
+            // Lógica do status da mensagem (só para mensagens de texto)
+            if (!isImage) {
+                holder.statusIcon.setVisibility(View.VISIBLE);
+                if (model.getStatus() == ChatMessageModel.STATUS_READ) {
+                    holder.statusIcon.setImageResource(R.drawable.ic_status_read);
+                    holder.statusIcon.setColorFilter(ContextCompat.getColor(context, R.color.my_secondary));
+                } else {
+                    holder.statusIcon.setImageResource(R.drawable.ic_status_sent);
+                    holder.statusIcon.setColorFilter(Color.GRAY);
+                }
             } else {
-                holder.statusIcon.setImageResource(R.drawable.ic_status_sent);
-                holder.statusIcon.setColorFilter(Color.GRAY);
+                holder.statusIcon.setVisibility(View.GONE); // Esconde o status para imagens
             }
+
 
         } else {
             // MENSAGEM RECEBIDA (ESQUERDA)
