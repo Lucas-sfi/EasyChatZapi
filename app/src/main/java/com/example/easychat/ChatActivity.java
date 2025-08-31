@@ -35,6 +35,7 @@ import com.firebase.ui.firestore.FirestoreRecyclerOptions;
 import com.github.dhaval2404.imagepicker.ImagePicker;
 import com.google.firebase.Timestamp;
 import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
@@ -87,6 +88,7 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
     Uri selectedImageUri;
 
     private long targetMessageTimestamp = -1;
+    private ListenerRegistration messageReadListener; // Listener para marcar mensagens como lidas
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -179,7 +181,6 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
         FirebaseUtil.getChatroomReference(chatroomId).addSnapshotListener((snapshot, e) -> {
             if (e != null) { return; }
 
-            // Lógica CORRIGIDA para recriar a conversa
             if (snapshot == null || !snapshot.exists()) {
                 if (!FirebaseUtil.isGroupChat(chatroomId) && otherUser != null) {
                     chatroomModel = new ChatroomModel(
@@ -189,7 +190,6 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
                     );
                     FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel);
                 } else {
-                    // Se for um grupo que não existe, ou se não houver otherUser, não podemos continuar
                     Toast.makeText(this, "Chat not found", Toast.LENGTH_SHORT).show();
                     finish();
                     return;
@@ -206,10 +206,12 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
                             otherUser = documentSnapshot.toObject(UserModel.class);
                             updateUI();
                             setupChatRecyclerView();
+                            markMessagesAsRead(); // Marcar mensagens como lidas
                         });
             } else {
                 updateUI();
                 setupChatRecyclerView();
+                markMessagesAsRead(); // Marcar mensagens como lidas
             }
         });
     }
@@ -287,7 +289,7 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
             });
 
             if (targetMessageTimestamp != -1) {
-                // ... (código existente para deslizar)
+                // ...
             } else {
                 new Handler().postDelayed(() -> {
                     if(adapter.getItemCount() > 0){
@@ -326,8 +328,6 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
         FirebaseUtil.getChatroomMessageReference(chatroomId).add(chatMessageModel);
     }
 
-    // ... (restantes métodos continuam iguais)
-
     private void toggleSearchBar() {
         if (inChatSearchBar.getVisibility() == View.VISIBLE) {
             inChatSearchBar.setVisibility(View.GONE);
@@ -337,25 +337,34 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
         }
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        markMessagesAsRead();
-    }
-
+    // CORREÇÃO: Lógica de marcar como lido agora usa um Listener
     private void markMessagesAsRead() {
         if (chatroomModel != null && !chatroomModel.isGroupChat() && otherUser != null) {
-            FirebaseUtil.getChatroomMessageReference(chatroomId)
+            // Remove o listener anterior se ele existir, para evitar múltiplos listeners
+            if (messageReadListener != null) {
+                messageReadListener.remove();
+            }
+
+            messageReadListener = FirebaseUtil.getChatroomMessageReference(chatroomId)
                     .whereEqualTo("senderId", otherUser.getUserId())
                     .whereEqualTo("status", ChatMessageModel.STATUS_SENT)
-                    .get()
-                    .addOnCompleteListener(task -> {
-                        if (task.isSuccessful() && task.getResult() != null) {
-                            for (DocumentSnapshot document : task.getResult().getDocuments()) {
-                                document.getReference().update("status", ChatMessageModel.STATUS_READ);
-                            }
+                    .addSnapshotListener((querySnapshot, e) -> {
+                        if (e != null || querySnapshot == null) {
+                            return;
+                        }
+                        for (DocumentSnapshot document : querySnapshot.getDocuments()) {
+                            document.getReference().update("status", ChatMessageModel.STATUS_READ);
                         }
                     });
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        // É crucial remover o listener quando a activity não está mais visível
+        if (messageReadListener != null) {
+            messageReadListener.remove();
         }
     }
 

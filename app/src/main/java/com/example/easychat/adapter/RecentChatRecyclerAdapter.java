@@ -20,7 +20,6 @@ import com.example.easychat.utils.AndroidUtil;
 import com.example.easychat.utils.FirebaseUtil;
 import com.firebase.ui.firestore.FirestoreRecyclerAdapter;
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
-import com.google.firebase.firestore.Query;
 
 public class RecentChatRecyclerAdapter extends FirestoreRecyclerAdapter<ChatroomModel, RecentChatRecyclerAdapter.ChatroomModelViewHolder> {
 
@@ -51,58 +50,60 @@ public class RecentChatRecyclerAdapter extends FirestoreRecyclerAdapter<Chatroom
             holder.itemView.setBackground(ContextCompat.getDrawable(context, R.drawable.edit_text_rounded_corner));
         } else {
             FirebaseUtil.getOtherUserFromChatroom(model.getUserIds())
-                    .addSnapshotListener((value, error) -> {
-                        if (error != null || value == null || !value.exists()) return;
-                        UserModel otherUserModel = value.toObject(UserModel.class);
-                        if (otherUserModel == null) return;
+                    .get().addOnSuccessListener(documentSnapshot -> {
+                        if (documentSnapshot.exists()) {
+                            UserModel otherUserModel = documentSnapshot.toObject(UserModel.class);
 
-                        // LÓGICA DE STATUS ATUALIZADA
-                        holder.statusIndicator.setVisibility(View.VISIBLE);
-                        if ("busy".equals(otherUserModel.getUserStatus())) {
-                            holder.statusIndicator.setImageResource(R.drawable.busy_indicator);
-                        } else if ("online".equals(otherUserModel.getUserStatus())) {
-                            holder.statusIndicator.setImageResource(R.drawable.online_indicator);
-                        } else {
-                            holder.statusIndicator.setImageResource(R.drawable.offline_indicator);
+                            holder.statusIndicator.setVisibility(View.VISIBLE);
+                            if ("busy".equals(otherUserModel.getUserStatus())) {
+                                holder.statusIndicator.setImageResource(R.drawable.busy_indicator);
+                            } else if ("online".equals(otherUserModel.getUserStatus())) {
+                                holder.statusIndicator.setImageResource(R.drawable.online_indicator);
+                            } else {
+                                holder.statusIndicator.setImageResource(R.drawable.offline_indicator);
+                            }
+
+                            AndroidUtil.passUserModelAsIntent(intent, otherUserModel);
+                            boolean lastMessageSentByMe = model.getLastMessageSenderId().equals(FirebaseUtil.currentUserId());
+
+                            FirebaseUtil.getOtherProfilePicStorageRef(otherUserModel.getUserId()).getDownloadUrl()
+                                    .addOnCompleteListener(t -> {
+                                        if (t.isSuccessful()) {
+                                            Uri uri = t.getResult();
+                                            AndroidUtil.setProfilePic(context, uri, holder.profilePic);
+                                        }
+                                    });
+
+                            holder.usernameText.setText(otherUserModel.getUsername());
+                            if (lastMessageSentByMe) holder.lastMessageText.setText("You: " + model.getLastMessage());
+                            else holder.lastMessageText.setText(model.getLastMessage());
+                            holder.lastMessageTime.setText(FirebaseUtil.timestampToString(model.getLastMessageTimestamp()));
+
+                            // CORREÇÃO: Lógica de contagem agora usa um Listener
+                            String chatroomId = FirebaseUtil.getChatroomId(FirebaseUtil.currentUserId(), otherUserModel.getUserId());
+                            FirebaseUtil.getChatroomMessageReference(chatroomId)
+                                    .whereEqualTo("senderId", otherUserModel.getUserId())
+                                    .whereEqualTo("status", ChatMessageModel.STATUS_SENT)
+                                    .addSnapshotListener((querySnapshot, e) -> {
+                                        if (e != null) { return; }
+
+                                        if (querySnapshot != null) {
+                                            int unreadCount = querySnapshot.size();
+                                            if (unreadCount > 0) {
+                                                holder.unreadCountText.setText(String.valueOf(unreadCount));
+                                                holder.unreadCountText.setVisibility(View.VISIBLE);
+                                            } else {
+                                                holder.unreadCountText.setVisibility(View.GONE);
+                                            }
+                                            // Lógica para o destaque da notificação personalizada
+                                            if (hasCustomNotif && unreadCount > 0) {
+                                                holder.itemView.setBackground(ContextCompat.getDrawable(context, R.drawable.list_item_background_highlight));
+                                            } else {
+                                                holder.itemView.setBackground(ContextCompat.getDrawable(context, R.drawable.edit_text_rounded_corner));
+                                            }
+                                        }
+                                    });
                         }
-
-                        AndroidUtil.passUserModelAsIntent(intent, otherUserModel);
-                        boolean lastMessageSentByMe = model.getLastMessageSenderId().equals(FirebaseUtil.currentUserId());
-
-                        FirebaseUtil.getOtherProfilePicStorageRef(otherUserModel.getUserId()).getDownloadUrl()
-                                .addOnCompleteListener(t -> {
-                                    if (t.isSuccessful()) {
-                                        Uri uri = t.getResult();
-                                        AndroidUtil.setProfilePic(context, uri, holder.profilePic);
-                                    }
-                                });
-
-                        holder.usernameText.setText(otherUserModel.getUsername());
-                        if (lastMessageSentByMe) holder.lastMessageText.setText("You: " + model.getLastMessage());
-                        else holder.lastMessageText.setText(model.getLastMessage());
-                        holder.lastMessageTime.setText(FirebaseUtil.timestampToString(model.getLastMessageTimestamp()));
-
-                        String chatroomId = FirebaseUtil.getChatroomId(FirebaseUtil.currentUserId(), otherUserModel.getUserId());
-                        FirebaseUtil.getChatroomMessageReference(chatroomId)
-                                .whereEqualTo("senderId", otherUserModel.getUserId())
-                                .whereEqualTo("status", ChatMessageModel.STATUS_SENT)
-                                .get()
-                                .addOnCompleteListener(countTask -> {
-                                    if (countTask.isSuccessful()) {
-                                        int unreadCount = countTask.getResult().size();
-                                        if (unreadCount > 0) {
-                                            holder.unreadCountText.setText(String.valueOf(unreadCount));
-                                            holder.unreadCountText.setVisibility(View.VISIBLE);
-                                        } else {
-                                            holder.unreadCountText.setVisibility(View.GONE);
-                                        }
-                                        if (hasCustomNotif && unreadCount > 0) {
-                                            holder.itemView.setBackground(ContextCompat.getDrawable(context, R.drawable.list_item_background_highlight));
-                                        } else {
-                                            holder.itemView.setBackground(ContextCompat.getDrawable(context, R.drawable.edit_text_rounded_corner));
-                                        }
-                                    }
-                                });
                     });
         }
 

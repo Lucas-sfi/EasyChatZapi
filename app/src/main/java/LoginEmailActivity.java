@@ -11,6 +11,7 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.easychat.utils.FirebaseUtil;
@@ -24,6 +25,7 @@ public class LoginEmailActivity extends AppCompatActivity {
     ProgressBar progressBar;
     ImageButton backBtn;
     TextView goToSignUpText;
+    TextView forgotPasswordText; // Novo campo
     FirebaseAuth firebaseAuth;
 
     @Override
@@ -37,6 +39,7 @@ public class LoginEmailActivity extends AppCompatActivity {
         progressBar = findViewById(R.id.login_progress_bar);
         backBtn = findViewById(R.id.back_btn);
         goToSignUpText = findViewById(R.id.go_to_signup_text);
+        forgotPasswordText = findViewById(R.id.forgot_password_text); // Referência
 
         firebaseAuth = FirebaseAuth.getInstance();
 
@@ -45,6 +48,22 @@ public class LoginEmailActivity extends AppCompatActivity {
         goToSignUpText.setOnClickListener(v ->
                 startActivity(new Intent(LoginEmailActivity.this, SignUpEmailActivity.class))
         );
+
+        // Lógica para o "Esqueceu a senha?"
+        forgotPasswordText.setOnClickListener(v -> showRecoveryDialog());
+    }
+
+    void showRecoveryDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle("Recuperação de Conta")
+                .setMessage("Para redefinir sua senha, você precisará fazer login com o número de telefone associado a esta conta. Deseja continuar?")
+                .setPositiveButton("Continuar", (dialog, which) -> {
+                    // Redireciona para o login com telefone
+                    Intent intent = new Intent(LoginEmailActivity.this, LoginPhoneNumberActivity.class);
+                    startActivity(intent);
+                })
+                .setNegativeButton("Cancelar", null)
+                .show();
     }
 
     void handleLogin() {
@@ -95,10 +114,12 @@ public class LoginEmailActivity extends AppCompatActivity {
             progressBar.setVisibility(View.VISIBLE);
             loginBtn.setVisibility(View.GONE);
             goToSignUpText.setVisibility(View.GONE);
+            forgotPasswordText.setVisibility(View.GONE);
         } else {
             progressBar.setVisibility(View.GONE);
             loginBtn.setVisibility(View.VISIBLE);
             goToSignUpText.setVisibility(View.VISIBLE);
+            forgotPasswordText.setVisibility(View.VISIBLE);
         }
     }
 }
