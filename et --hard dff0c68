@@ -1,0 +1,29 @@
+[33m847cb13[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m, [m[1;31morigin/master[m[33m)[m HEAD@{0}: reset: moving to HEAD~1
+[33mdff0c68[m HEAD@{1}: commit: t
+[33m847cb13[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m, [m[1;31morigin/master[m[33m)[m HEAD@{2}: commit: remove contact bug
+[33me888898[m HEAD@{3}: commit: notification and groups working
+[33m70d53f5[m HEAD@{4}: commit: save commit
+[33me564eb7[m HEAD@{5}: commit: notification completed
+[33mc0ebe44[m HEAD@{6}: commit: save modifications
+[33m4fea8be[m HEAD@{7}: commit: chat notification finally
+[33mb4ca361[m HEAD@{8}: commit: notification persistent bugs
+[33ma4dfeaa[m HEAD@{9}: commit: commit to fix bug notification
+[33m622880a[m HEAD@{10}: commit: fixing group creation bugs
+[33m58b8641[m HEAD@{11}: commit: last commit
+[33m58a9a2d[m HEAD@{12}: commit: fixing image bugs
+[33m2f2a948[m HEAD@{13}: commit: images
+[33m5a88413[m HEAD@{14}: commit: lista de transmissao
+[33me46a62b[m HEAD@{15}: commit: color changes
+[33m4a87068[m HEAD@{16}: commit: login persist feature
+[33m517642f[m HEAD@{17}: commit: login feature
+[33mbb24ba1[m HEAD@{18}: commit: fixing users bugs
+[33ma751da3[m HEAD@{19}: commit: feature pin message
+[33meb27d54[m HEAD@{20}: commit: feature search in messages
+[33me211c00[m HEAD@{21}: commit: feature search conversation
+[33m0693795[m HEAD@{22}: commit: Feature Buscar Contatos
+[33m7202d92[m HEAD@{23}: commit: funcionalidade de status do usuario
+[33ma4fe7fd[m HEAD@{24}: commit: funcionalidade de notificações personalizadas
+[33m8c8c3ed[m HEAD@{25}: commit: remover contato e sair do grupo
+[33m637e87e[m HEAD@{26}: commit: funcionalidade completa de Grupo
+[33meac9149[m HEAD@{27}: commit: griando funcionalidade de grupo
+[33mfef5409[m HEAD@{28}: commit (initial): bora
