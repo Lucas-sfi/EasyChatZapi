@@ -31,6 +31,8 @@ import com.example.easychat.utils.FirebaseUtil;
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
 import com.github.dhaval2404.imagepicker.ImagePicker;
 import com.google.firebase.Timestamp;
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
@@ -304,7 +306,7 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
                     );
                     FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel)
                             .addOnSuccessListener(aVoid -> {
-                                // NOVO: Adicionar usuários à lista de contatos um do outro
+                                // Adicionar usuários à lista de contatos um do outro
                                 addContact(FirebaseUtil.currentUserId(), otherUser.getUserId());
                                 addContact(otherUser.getUserId(), FirebaseUtil.currentUserId());
                             });
@@ -316,20 +318,10 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
     }
 
     private void addContact(String userId, String contactId) {
-        FirebaseUtil.allUserCollectionReference().document(userId).get().addOnSuccessListener(documentSnapshot -> {
-            UserModel user = documentSnapshot.toObject(UserModel.class);
-            if (user != null) {
-                List<String> contacts = user.getContacts();
-                if (contacts == null) {
-                    contacts = new ArrayList<>();
-                }
-                if (!contacts.contains(contactId)) {
-                    contacts.add(contactId);
-                    user.setContacts(contacts);
-                    FirebaseUtil.allUserCollectionReference().document(userId).set(user);
-                }
-            }
-        });
+        if (userId == null || contactId == null) return;
+        DocumentReference userDocRef = FirebaseUtil.allUserCollectionReference().document(userId);
+        // Usa arrayUnion para adicionar o contato de forma atômica, evitando duplicatas
+        userDocRef.update("contacts", FieldValue.arrayUnion(contactId));
     }
 
 

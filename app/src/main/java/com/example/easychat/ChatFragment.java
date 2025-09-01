@@ -66,7 +66,8 @@ public class ChatFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
+        // A chamada notifyDataSetChanged() foi removida daqui, pois o adapter já escuta as mudanças em tempo real.
         if(adapter!=null)
-            adapter.notifyDataSetChanged();
+            adapter.startListening();
     }
 }

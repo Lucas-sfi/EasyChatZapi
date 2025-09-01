@@ -16,7 +16,7 @@ import com.example.easychat.utils.AndroidUtil;
 import com.example.easychat.utils.FirebaseUtil;
 import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.google.firebase.firestore.DocumentReference;
-import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.WriteBatch;
 
@@ -98,26 +98,31 @@ public class UserSettingsActivity extends AppCompatActivity {
     }
 
     private void deleteContactAndChatroom() {
-        // Passo 1 (CRÍTICO): Deletar o documento do chatroom.
-        // Isso garante que ele desapareça imediatamente da lista de chats do usuário.
-        FirebaseUtil.getChatroomReference(chatroomId).delete()
-                .addOnSuccessListener(aVoid -> {
-                    // Se a exclusão principal for bem-sucedida, realize as tarefas de limpeza.
+        // Usa um WriteBatch para garantir que todas as operações sejam atômicas
+        WriteBatch batch = FirebaseUtil.getFirestore().batch();
 
-                    // Limpeza 1: Deletar a subcoleção de mensagens.
-                    deleteChatMessages();
+        // 1. Adiciona a exclusão do chatroom ao lote
+        DocumentReference chatroomRef = FirebaseUtil.getChatroomReference(chatroomId);
+        batch.delete(chatroomRef);
 
-                    // Limpeza 2: Remover os usuários das listas de contatos um do outro.
-                    removeContactFromUserList(FirebaseUtil.currentUserId(), otherUser.getUserId());
-                    removeContactFromUserList(otherUser.getUserId(), FirebaseUtil.currentUserId());
+        // 2. Adiciona a remoção do contato da lista do usuário atual ao lote
+        DocumentReference currentUserRef = FirebaseUtil.allUserCollectionReference().document(FirebaseUtil.currentUserId());
+        batch.update(currentUserRef, "contacts", FieldValue.arrayRemove(otherUser.getUserId()));
 
-                    Toast.makeText(UserSettingsActivity.this, "Contact removed successfully", Toast.LENGTH_SHORT).show();
-                    goToMainActivity();
-                })
-                .addOnFailureListener(e -> {
-                    // Se a exclusão principal falhar, informe o usuário e não faça mais nada.
-                    Toast.makeText(UserSettingsActivity.this, "Failed to remove contact. Please try again.", Toast.LENGTH_SHORT).show();
-                });
+        // 3. Adiciona a remoção do usuário atual da lista do outro contato ao lote
+        DocumentReference otherUserRef = FirebaseUtil.allUserCollectionReference().document(otherUser.getUserId());
+        batch.update(otherUserRef, "contacts", FieldValue.arrayRemove(FirebaseUtil.currentUserId()));
+
+        // Executa o lote de operações
+        batch.commit().addOnSuccessListener(aVoid -> {
+            // Se o lote for bem-sucedido, as operações principais foram concluídas
+            deleteChatMessages(); // Executa a limpeza das mensagens em segundo plano
+
+            Toast.makeText(UserSettingsActivity.this, "Contact removed successfully", Toast.LENGTH_SHORT).show();
+            goToMainActivity();
+        }).addOnFailureListener(e -> {
+            Toast.makeText(UserSettingsActivity.this, "Failed to remove contact. Please try again.", Toast.LENGTH_SHORT).show();
+        });
     }
 
     private void deleteChatMessages() {
@@ -128,25 +133,9 @@ public class UserSettingsActivity extends AppCompatActivity {
                         batch.delete(doc.getReference());
                     }
                     // Executa a exclusão das mensagens em segundo plano.
-                    // Não precisamos esperar por isso para continuar, pois o chat já sumiu da lista.
+                    // Não precisamos esperar por isso para continuar.
                     batch.commit();
                 });
-    }
-
-    private void removeContactFromUserList(String userId, String contactIdToRemove) {
-        if (userId == null || contactIdToRemove == null) return;
-        DocumentReference userDocRef = FirebaseUtil.allUserCollectionReference().document(userId);
-
-        // Executa a atualização da lista de contatos em segundo plano.
-        userDocRef.get().addOnSuccessListener(documentSnapshot -> {
-            if (documentSnapshot.exists()) {
-                UserModel user = documentSnapshot.toObject(UserModel.class);
-                if (user != null && user.getContacts() != null && user.getContacts().contains(contactIdToRemove)) {
-                    user.getContacts().remove(contactIdToRemove);
-                    userDocRef.set(user); // Atualiza o documento do usuário
-                }
-            }
-        });
     }
 
     private void goToMainActivity(){
