@@ -34,9 +34,8 @@ public class RecentChatRecyclerAdapter extends FirestoreRecyclerAdapter<Chatroom
 
     @Override
     protected void onBindViewHolder(@NonNull ChatroomModelViewHolder holder, int position, @NonNull ChatroomModel model) {
-        holder.removeListeners(); // Limpa listeners antigos
+        holder.removeListeners();
 
-        // Lógica da última mensagem
         String lastMessage = model.getLastMessage() != null ? model.getLastMessage() : "";
         boolean lastMessageSentByMe = model.getLastMessageSenderId() != null && model.getLastMessageSenderId().equals(FirebaseUtil.currentUserId());
 
@@ -47,7 +46,6 @@ public class RecentChatRecyclerAdapter extends FirestoreRecyclerAdapter<Chatroom
         }
         holder.lastMessageTime.setText(FirebaseUtil.timestampToString(model.getLastMessageTimestamp()));
 
-        // Lógica para grupos vs. conversas individuais
         if (model.isGroupChat()) {
             holder.usernameText.setText(model.getGroupName());
             holder.profilePic.setImageResource(R.drawable.chat_icon);
@@ -70,6 +68,19 @@ public class RecentChatRecyclerAdapter extends FirestoreRecyclerAdapter<Chatroom
 
                         holder.usernameText.setText(otherUserModel.getUsername());
 
+                        holder.statusIndicator.setVisibility(View.VISIBLE);
+                        switch (otherUserModel.getUserStatus()) {
+                            case "online":
+                                holder.statusIndicator.setImageResource(R.drawable.online_indicator);
+                                break;
+                            case "busy":
+                                holder.statusIndicator.setImageResource(R.drawable.busy_indicator);
+                                break;
+                            default:
+                                holder.statusIndicator.setImageResource(R.drawable.offline_indicator);
+                                break;
+                        }
+
                         FirebaseUtil.getOtherProfilePicStorageRef(otherUserModel.getUserId()).getDownloadUrl()
                                 .addOnCompleteListener(t -> {
                                     if (t.isSuccessful()) {
@@ -77,7 +88,6 @@ public class RecentChatRecyclerAdapter extends FirestoreRecyclerAdapter<Chatroom
                                     }
                                 });
 
-                        // Anexa um listener para o chatroom que controlará o destaque e a contagem de não lidos
                         holder.attachChatroomListener(model.getChatroomId(), otherUserModel.getUserId());
 
                         holder.itemView.setOnClickListener(v -> {
@@ -107,7 +117,7 @@ public class RecentChatRecyclerAdapter extends FirestoreRecyclerAdapter<Chatroom
         TextView usernameText, lastMessageText, lastMessageTime, unreadCountText;
         ImageView profilePic, statusIndicator;
         ListenerRegistration unreadCountListener;
-        ListenerRegistration chatroomListener; // Listener para o chatroom
+        ListenerRegistration chatroomListener;
 
         public ChatroomModelViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -130,13 +140,12 @@ public class RecentChatRecyclerAdapter extends FirestoreRecyclerAdapter<Chatroom
                         boolean hasCustomNotif = chatroomModel.getCustomNotificationStatus()
                                 .getOrDefault(FirebaseUtil.currentUserId(), false);
 
-                        // Agora, anexa ou reavalia a contagem de mensagens não lidas
                         attachUnreadCountListener(chatroomId, otherUserId, hasCustomNotif);
                     });
         }
 
         void attachUnreadCountListener(String chatroomId, String otherUserId, boolean hasCustomNotif) {
-            removeUnreadCountListener(); // Remove o listener antigo antes de adicionar um novo
+            removeUnreadCountListener();
 
             unreadCountListener = FirebaseUtil.getChatroomMessageReference(chatroomId)
                     .whereEqualTo("senderId", otherUserId)
@@ -153,7 +162,6 @@ public class RecentChatRecyclerAdapter extends FirestoreRecyclerAdapter<Chatroom
                                 unreadCountText.setVisibility(View.GONE);
                             }
 
-                            // Lógica de destaque
                             if (hasCustomNotif && unreadCount > 0) {
                                 itemView.setBackground(ContextCompat.getDrawable(itemView.getContext(), R.drawable.list_item_background_highlight));
                             } else {

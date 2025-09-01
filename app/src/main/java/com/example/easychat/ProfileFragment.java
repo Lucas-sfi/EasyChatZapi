@@ -18,6 +18,8 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -27,7 +29,6 @@ import com.example.easychat.utils.FirebaseUtil;
 import com.github.dhaval2404.imagepicker.ImagePicker;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
-import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.EmailAuthProvider;
 import com.google.firebase.auth.FirebaseAuth;
@@ -49,7 +50,8 @@ public class ProfileFragment extends Fragment {
     Button updateProfileBtn;
     ProgressBar progressBar;
     TextView logoutBtn;
-    SwitchMaterial busySwitch;
+    RadioGroup statusRadioGroup;
+    RadioButton radioOnline, radioOffline, radioBusy;
 
     UserModel currentUserModel;
     ActivityResultLauncher<Intent> imagePickLauncher;
@@ -87,7 +89,10 @@ public class ProfileFragment extends Fragment {
         updateProfileBtn = view.findViewById(R.id.profle_update_btn);
         progressBar = view.findViewById(R.id.profile_progress_bar);
         logoutBtn = view.findViewById(R.id.logout_btn);
-        busySwitch = view.findViewById(R.id.busy_switch);
+        statusRadioGroup = view.findViewById(R.id.status_radio_group);
+        radioOnline = view.findViewById(R.id.radio_online);
+        radioOffline = view.findViewById(R.id.radio_offline);
+        radioBusy = view.findViewById(R.id.radio_busy);
 
         getUserData();
 
@@ -110,6 +115,19 @@ public class ProfileFragment extends Fragment {
                         imagePickLauncher.launch(intent);
                         return null;
                     });
+        });
+
+        statusRadioGroup.setOnCheckedChangeListener((group, checkedId) -> {
+            if (currentUserModel != null) {
+                String status = "offline";
+                if (checkedId == R.id.radio_online) {
+                    status = "online";
+                } else if (checkedId == R.id.radio_busy) {
+                    status = "busy";
+                }
+                currentUserModel.setUserStatus(status);
+                updateToFirestore();
+            }
         });
 
         return view;
@@ -139,15 +157,11 @@ public class ProfileFragment extends Fragment {
 
         setInProgress(true);
 
-        // Lógica para VINCULAR e-mail ou ATUALIZAR senha
         if (currentUserModel.getEmail() == null && !newEmail.isEmpty()) {
-            // Caso 1: Usuário de telefone está VINCULANDO um e-mail pela primeira vez
             handleLinkEmail(newEmail, newPassword, confirmPassword);
         } else if (currentUserModel.getEmail() != null && !newPassword.isEmpty()) {
-            // Caso 2: Usuário com e-mail já vinculado está ATUALIZANDO a senha
             handleUpdatePassword(newPassword, confirmPassword);
         } else {
-            // Caso 3: Nenhuma ação de senha, apenas atualiza foto e outros dados
             if(selectedImageUri!=null){
                 FirebaseUtil.getCurrentProfilePicStorageRef().putFile(selectedImageUri)
                         .addOnCompleteListener(task -> updateToFirestore());
@@ -265,21 +279,22 @@ public class ProfileFragment extends Fragment {
 
                 if (currentUserModel.getEmail() != null && !currentUserModel.getEmail().isEmpty()) {
                     emailInput.setText(currentUserModel.getEmail());
-                    emailInput.setEnabled(false); // Desabilita o campo de e-mail se já existir
+                    emailInput.setEnabled(false);
                 } else {
-                    // Se não tem e-mail, o usuário pode vincular um
                     emailInput.setEnabled(true);
                 }
 
-                busySwitch.setChecked("busy".equals(currentUserModel.getUserStatus()));
-                busySwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                    if (isChecked) {
-                        currentUserModel.setUserStatus("busy");
-                    } else {
-                        currentUserModel.setUserStatus("online");
-                    }
-                    updateToFirestore();
-                });
+                switch (currentUserModel.getUserStatus()) {
+                    case "online":
+                        radioOnline.setChecked(true);
+                        break;
+                    case "busy":
+                        radioBusy.setChecked(true);
+                        break;
+                    default:
+                        radioOffline.setChecked(true);
+                        break;
+                }
             }
         });
     }

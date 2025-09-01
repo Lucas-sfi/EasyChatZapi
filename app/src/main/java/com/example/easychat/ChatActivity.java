@@ -12,7 +12,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
 import android.util.Log;
+import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -63,11 +65,17 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
     TextView toolbarTitle;
     RecyclerView recyclerView;
     ImageView toolbarProfilePic;
+    ImageView statusIndicator;
     RelativeLayout toolbar;
     ImageButton attachFileButton;
     ActivityResultLauncher<Intent> imagePickerLauncher;
     Uri selectedImageUri;
     ListenerRegistration unreadMessagesListener;
+
+    // UI para mensagem fixada
+    RelativeLayout pinnedMessageLayout;
+    TextView pinnedMessageText;
+    ImageButton unpinBtn;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -80,8 +88,14 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
         toolbarTitle = findViewById(R.id.other_username);
         recyclerView = findViewById(R.id.chat_recycler_view);
         toolbarProfilePic = findViewById(R.id.profile_pic_image_view);
+        statusIndicator = findViewById(R.id.status_indicator);
         toolbar = findViewById(R.id.toolbar);
         attachFileButton = findViewById(R.id.attach_file_btn);
+
+        // Referências para a UI de mensagem fixada
+        pinnedMessageLayout = findViewById(R.id.pinned_message_layout);
+        pinnedMessageText = findViewById(R.id.pinned_message_text);
+        unpinBtn = findViewById(R.id.unpin_btn);
 
         otherUser = AndroidUtil.getUserModelFromIntent(getIntent());
         chatroomId = getIntent().getStringExtra("chatroomId");
@@ -192,6 +206,61 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
         });
     }
 
+    private void setupPinnedMessageUI() {
+        if (chatroomModel != null && chatroomModel.getPinnedMessageId() != null && !chatroomModel.getPinnedMessageId().isEmpty()) {
+            FirebaseUtil.getChatroomMessageReference(chatroomId).document(chatroomModel.getPinnedMessageId()).get()
+                    .addOnSuccessListener(documentSnapshot -> {
+                        if (documentSnapshot.exists()) {
+                            ChatMessageModel pinnedMessage = documentSnapshot.toObject(ChatMessageModel.class);
+                            if (pinnedMessage != null) {
+                                pinnedMessageText.setText(pinnedMessage.getMessage());
+                                pinnedMessageLayout.setVisibility(View.VISIBLE);
+
+                                pinnedMessageLayout.setOnClickListener(v -> scrollToMessage(chatroomModel.getPinnedMessageId()));
+                                unpinBtn.setOnClickListener(v -> unpinMessage());
+                            }
+                        } else {
+                            unpinMessage();
+                        }
+                    });
+        } else {
+            pinnedMessageLayout.setVisibility(View.GONE);
+        }
+    }
+
+    private void scrollToMessage(String messageId) {
+        int position = -1;
+        for (int i = 0; i < adapter.getItemCount(); i++) {
+            if (adapter.getSnapshots().getSnapshot(i).getId().equals(messageId)) {
+                position = i;
+                break;
+            }
+        }
+        if (position != -1) {
+            recyclerView.smoothScrollToPosition(position);
+            adapter.highlightMessage(messageId);
+            new Handler().postDelayed(() -> adapter.highlightMessage(null), 2000);
+        } else {
+            Toast.makeText(this, "Message not found.", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void unpinMessage() {
+        if (chatroomModel != null) {
+            chatroomModel.setPinnedMessageId(null);
+            FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel);
+        }
+    }
+
+    @Override
+    public void onPinMessageClicked(String messageId) {
+        if (chatroomModel != null) {
+            chatroomModel.setPinnedMessageId(messageId);
+            FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel)
+                    .addOnSuccessListener(aVoid -> Toast.makeText(this, "Message pinned", Toast.LENGTH_SHORT).show());
+        }
+    }
+
     private void sendMessageToUser(String message) {
         if (chatroomModel == null) return;
         chatroomModel.setLastMessageTimestamp(Timestamp.now());
@@ -212,26 +281,51 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
     }
 
     private void getOrCreateChatroomModel() {
-        FirebaseUtil.getChatroomReference(chatroomId).get().addOnCompleteListener(task -> {
-            if (task.isSuccessful()) {
-                chatroomModel = task.getResult().toObject(ChatroomModel.class);
-                if (chatroomModel == null) {
-                    chatroomModel = new ChatroomModel(
-                            chatroomId,
-                            Arrays.asList(FirebaseUtil.currentUserId(), otherUser.getUserId()),
-                            Timestamp.now(),
-                            "", "", false
-                    );
-                    FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel);
-                }
-                updateToolbarUI();
+        FirebaseUtil.getChatroomReference(chatroomId).addSnapshotListener((snapshot, e) -> {
+            if (e != null) {
+                return;
             }
+            if (snapshot != null && snapshot.exists()) {
+                chatroomModel = snapshot.toObject(ChatroomModel.class);
+            } else {
+                chatroomModel = new ChatroomModel(
+                        chatroomId,
+                        Arrays.asList(FirebaseUtil.currentUserId(), otherUser.getUserId()),
+                        Timestamp.now(),
+                        "", "", false
+                );
+                FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel);
+            }
+            updateToolbarUI();
+            setupPinnedMessageUI();
         });
     }
 
     private void updateToolbarUI() {
         if (otherUser != null) {
-            toolbarTitle.setText(otherUser.getUsername());
+            FirebaseUtil.allUserCollectionReference().document(otherUser.getUserId()).addSnapshotListener((value, error) -> {
+                if (error != null || value == null) {
+                    return;
+                }
+                UserModel updatedOtherUser = value.toObject(UserModel.class);
+                if (updatedOtherUser != null) {
+                    toolbarTitle.setText(updatedOtherUser.getUsername());
+
+                    statusIndicator.setVisibility(View.VISIBLE);
+                    switch (updatedOtherUser.getUserStatus()) {
+                        case "online":
+                            statusIndicator.setImageResource(R.drawable.online_indicator);
+                            break;
+                        case "busy":
+                            statusIndicator.setImageResource(R.drawable.busy_indicator);
+                            break;
+                        default:
+                            statusIndicator.setImageResource(R.drawable.offline_indicator);
+                            break;
+                    }
+                }
+            });
+
             FirebaseUtil.getOtherProfilePicStorageRef(otherUser.getUserId()).getDownloadUrl()
                     .addOnCompleteListener(t -> {
                         if (t.isSuccessful()) {
@@ -328,6 +422,4 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
             @Override public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {}
         });
     }
-
-    @Override public void onPinMessageClicked(String messageId) {}
 }

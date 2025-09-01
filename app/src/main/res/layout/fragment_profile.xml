@@ -23,13 +23,31 @@
             android:scaleType="centerCrop"
             android:layout_marginBottom="20dp"/>
 
-        <com.google.android.material.switchmaterial.SwitchMaterial
-            android:id="@+id/busy_switch"
+        <RadioGroup
+            android:id="@+id/status_radio_group"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Set as Busy"
-            android:textSize="18sp"
-            android:layout_marginBottom="10dp"/>
+            android:orientation="horizontal"
+            android:layout_marginBottom="10dp">
+
+            <RadioButton
+                android:id="@+id/radio_online"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Online"/>
+
+            <RadioButton
+                android:id="@+id/radio_offline"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Offline"/>
+
+            <RadioButton
+                android:id="@+id/radio_busy"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Busy"/>
+        </RadioGroup>
 
         <EditText
             android:id="@+id/profile_username"

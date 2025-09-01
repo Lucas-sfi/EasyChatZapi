@@ -53,18 +53,14 @@ public class ChatRecyclerAdapter extends FirestoreRecyclerAdapter<ChatMessageMod
             holder.rightChatLayout.setVisibility(View.VISIBLE);
 
             if (isImage) {
-                // Se for imagem
                 holder.rightChatTextview.setVisibility(View.GONE);
                 holder.rightChatImageView.setVisibility(View.VISIBLE);
                 Glide.with(context).load(model.getMessage()).into(holder.rightChatImageView);
             } else {
-                // Se for texto
-                holder.rightChatImageView.setVisibility(View.GONE);
                 holder.rightChatTextview.setVisibility(View.VISIBLE);
                 holder.rightChatTextview.setText(model.getMessage());
             }
 
-            // Lógica do status da mensagem (só para mensagens de texto)
             if (!isImage) {
                 holder.statusIcon.setVisibility(View.VISIBLE);
                 if (model.getStatus() == ChatMessageModel.STATUS_READ) {
@@ -75,7 +71,7 @@ public class ChatRecyclerAdapter extends FirestoreRecyclerAdapter<ChatMessageMod
                     holder.statusIcon.setColorFilter(Color.GRAY);
                 }
             } else {
-                holder.statusIcon.setVisibility(View.GONE); // Esconde o status para imagens
+                holder.statusIcon.setVisibility(View.GONE);
             }
 
 
@@ -85,21 +81,17 @@ public class ChatRecyclerAdapter extends FirestoreRecyclerAdapter<ChatMessageMod
             holder.leftChatLayout.setVisibility(View.VISIBLE);
 
             if (isImage) {
-                // Se for imagem
                 holder.leftChatTextview.setVisibility(View.GONE);
                 holder.leftChatImageView.setVisibility(View.VISIBLE);
                 Glide.with(context).load(model.getMessage()).into(holder.leftChatImageView);
             } else {
-                // Se for texto
                 holder.leftChatImageView.setVisibility(View.GONE);
                 holder.leftChatTextview.setVisibility(View.VISIBLE);
                 holder.leftChatTextview.setText(model.getMessage());
             }
         }
 
-        // LÓGICA DE CLIQUE
         if (isImage) {
-            // Se for uma imagem, o clique abre a tela de visualização
             holder.itemView.setOnClickListener(v -> {
                 Intent intent = new Intent(context, FullSizeImageActivity.class);
                 intent.putExtra("imageUrl", model.getMessage());
@@ -107,7 +99,6 @@ public class ChatRecyclerAdapter extends FirestoreRecyclerAdapter<ChatMessageMod
                 context.startActivity(intent);
             });
         } else {
-            // Se for texto, não faz nada ao clicar
             holder.itemView.setOnClickListener(null);
         }
 

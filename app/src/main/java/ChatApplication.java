@@ -17,16 +17,12 @@ public class ChatApplication extends Application implements Application.Activity
 
     @Override
     public void onActivityStarted(@NonNull android.app.Activity activity) {
-        if (FirebaseUtil.isLoggedIn()) {
-            FirebaseUtil.currentUserDetails().update("userStatus", "online");
-        }
+        // Esta lógica foi removida para permitir o controle manual do status
     }
 
     @Override
     public void onActivityStopped(@NonNull android.app.Activity activity) {
-        if (FirebaseUtil.isLoggedIn()) {
-            FirebaseUtil.currentUserDetails().update("userStatus", "offline");
-        }
+        // Esta lógica foi removida para permitir o controle manual do status
     }
 
     // Métodos não utilizados
