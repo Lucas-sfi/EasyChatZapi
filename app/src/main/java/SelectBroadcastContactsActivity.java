@@ -10,7 +10,6 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.easychat.adapter.SelectUserRecyclerAdapter;
-import com.example.easychat.model.ChatroomModel;
 import com.example.easychat.model.UserModel;
 import com.example.easychat.utils.FirebaseUtil;
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
@@ -58,39 +57,29 @@ public class SelectBroadcastContactsActivity extends AppCompatActivity {
     }
 
     private void setupRecyclerView() {
-        FirebaseUtil.allChatroomCollectionReference()
-                .whereArrayContains("userIds", FirebaseUtil.currentUserId())
-                .get().addOnCompleteListener(task -> {
-                    if (task.isSuccessful()) {
-                        List<String> contactIds = new ArrayList<>();
-                        for (ChatroomModel chatroom : task.getResult().toObjects(ChatroomModel.class)) {
-                            // Garante que estamos pegando contatos apenas de conversas individuais
-                            if (!chatroom.isGroupChat()) {
-                                for (String userId : chatroom.getUserIds()) {
-                                    if (!userId.equals(FirebaseUtil.currentUserId())) {
-                                        contactIds.add(userId);
-                                    }
-                                }
-                            }
-                        }
+        FirebaseUtil.currentUserDetails().get().addOnCompleteListener(task -> {
+            if (task.isSuccessful() && task.getResult() != null) {
+                UserModel currentUser = task.getResult().toObject(UserModel.class);
+                if (currentUser != null && currentUser.getContacts() != null && !currentUser.getContacts().isEmpty()) {
+                    List<String> contactIds = currentUser.getContacts();
 
-                        if (!contactIds.isEmpty()) {
-                            Query query = FirebaseUtil.allUserCollectionReference()
-                                    .whereIn("userId", contactIds);
+                    Query query = FirebaseUtil.allUserCollectionReference()
+                            .whereIn("userId", contactIds);
 
-                            FirestoreRecyclerOptions<UserModel> options = new FirestoreRecyclerOptions.Builder<UserModel>()
-                                    .setQuery(query, UserModel.class).build();
+                    FirestoreRecyclerOptions<UserModel> options = new FirestoreRecyclerOptions.Builder<UserModel>()
+                            .setQuery(query, UserModel.class).build();
 
-                            // Passamos um new ArrayList<>() porque na lista de transmissão não há "membros atuais" a serem desabilitados
-                            adapter = new SelectUserRecyclerAdapter(options, getApplicationContext(), new ArrayList<>());
-                            recyclerView.setLayoutManager(new LinearLayoutManager(this));
-                            recyclerView.setAdapter(adapter);
-                            adapter.startListening();
-                        } else {
-                            Toast.makeText(this, "Você não tem contatos para criar uma lista de transmissão.", Toast.LENGTH_LONG).show();
-                        }
-                    }
-                });
+                    adapter = new SelectUserRecyclerAdapter(options, getApplicationContext(), new ArrayList<>());
+                    recyclerView.setLayoutManager(new LinearLayoutManager(this));
+                    recyclerView.setAdapter(adapter);
+                    adapter.startListening();
+                } else {
+                    Toast.makeText(this, "Você não tem contatos para criar uma lista de transmissão.", Toast.LENGTH_LONG).show();
+                }
+            } else {
+                Toast.makeText(this, "Não foi possível carregar seus contatos.", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     @Override

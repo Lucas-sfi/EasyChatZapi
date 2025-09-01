@@ -1,10 +1,12 @@
 package com.example.easychat.model;
 
 import com.google.firebase.Timestamp;
+import java.util.ArrayList;
+import java.util.List;
 
 public class UserModel {
     private String phone;
-    private String email; // Novo campo
+    private String email;
     private String username;
     private String searchUsername;
     private Timestamp createdTimestamp;
@@ -13,8 +15,10 @@ public class UserModel {
     private String userStatus;
     private int age;
     private String city;
+    private List<String> contacts; // NOVO CAMPO
 
     public UserModel() {
+        this.contacts = new ArrayList<>(); // Inicializa a lista
     }
 
     // Construtor para login com telefone
@@ -27,7 +31,8 @@ public class UserModel {
         this.userStatus = "offline";
         this.age = 0;
         this.city = "";
-        this.email = null; // Garante que o campo e-mail seja nulo
+        this.email = null;
+        this.contacts = new ArrayList<>(); // Inicializa a lista
     }
 
     // Novo construtor para login com e-mail
@@ -40,7 +45,17 @@ public class UserModel {
         this.userStatus = "offline";
         this.age = 0;
         this.city = "";
-        this.phone = null; // Garante que o campo telefone seja nulo
+        this.phone = null;
+        this.contacts = new ArrayList<>(); // Inicializa a lista
+    }
+
+    // GETTER E SETTER PARA O NOVO CAMPO
+    public List<String> getContacts() {
+        return contacts;
+    }
+
+    public void setContacts(List<String> contacts) {
+        this.contacts = contacts;
     }
 
     public String getEmail() {

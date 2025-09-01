@@ -24,7 +24,7 @@ public class SelectGroupMembersActivity extends AppCompatActivity {
     private ImageButton backButton;
     private FloatingActionButton nextButton;
     private ArrayList<String> currentMembers;
-    private String chatroomId; // Será preenchido se estivermos adicionando membros
+    private String chatroomId;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -54,10 +54,8 @@ public class SelectGroupMembersActivity extends AppCompatActivity {
             }
 
             if (chatroomId != null) {
-                // Modo: Adicionar membros a um grupo existente
                 addMembersToGroup(selectedIds);
             } else {
-                // Modo: Criar um novo grupo
                 Intent intent = new Intent(this, CreateGroupActivity.class);
                 intent.putStringArrayListExtra("userIds", selectedIds);
                 startActivity(intent);
@@ -82,38 +80,29 @@ public class SelectGroupMembersActivity extends AppCompatActivity {
     }
 
     private void setupRecyclerView() {
-        FirebaseUtil.allChatroomCollectionReference()
-                .whereArrayContains("userIds", FirebaseUtil.currentUserId())
-                .get().addOnCompleteListener(task -> {
-                    if (task.isSuccessful()) {
-                        List<String> contactIds = new ArrayList<>();
-                        for (ChatroomModel chatroom : task.getResult().toObjects(ChatroomModel.class)) {
-                            if (!chatroom.isGroupChat()) {
-                                for (String userId : chatroom.getUserIds()) {
-                                    if (!userId.equals(FirebaseUtil.currentUserId())) {
-                                        contactIds.add(userId);
-                                    }
-                                }
-                            }
-                        }
+        FirebaseUtil.currentUserDetails().get().addOnCompleteListener(task -> {
+            if (task.isSuccessful() && task.getResult() != null) {
+                UserModel currentUser = task.getResult().toObject(UserModel.class);
+                if (currentUser != null && currentUser.getContacts() != null && !currentUser.getContacts().isEmpty()) {
+                    List<String> contactIds = currentUser.getContacts();
 
-                        if (!contactIds.isEmpty()) {
-                            Query query = FirebaseUtil.allUserCollectionReference()
-                                    .whereIn("userId", contactIds);
+                    Query query = FirebaseUtil.allUserCollectionReference()
+                            .whereIn("userId", contactIds);
 
-                            FirestoreRecyclerOptions<UserModel> options = new FirestoreRecyclerOptions.Builder<UserModel>()
-                                    .setQuery(query, UserModel.class).build();
+                    FirestoreRecyclerOptions<UserModel> options = new FirestoreRecyclerOptions.Builder<UserModel>()
+                            .setQuery(query, UserModel.class).build();
 
-                            adapter = new SelectUserRecyclerAdapter(options, getApplicationContext(), currentMembers);
-                            recyclerView.setLayoutManager(new LinearLayoutManager(this));
-                            recyclerView.setAdapter(adapter);
-                            adapter.startListening();
-                        } else {
-                            // Opcional: Mostrar uma mensagem se o usuário não tiver contatos
-                            Toast.makeText(this, "Você não tem contatos para adicionar.", Toast.LENGTH_SHORT).show();
-                        }
-                    }
-                });
+                    adapter = new SelectUserRecyclerAdapter(options, getApplicationContext(), currentMembers);
+                    recyclerView.setLayoutManager(new LinearLayoutManager(this));
+                    recyclerView.setAdapter(adapter);
+                    adapter.startListening();
+                } else {
+                    Toast.makeText(this, "Você não tem contatos para adicionar.", Toast.LENGTH_SHORT).show();
+                }
+            } else {
+                Toast.makeText(this, "Não foi possível carregar seus contatos.", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     @Override

@@ -302,13 +302,36 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
                             Timestamp.now(),
                             "", "", false
                     );
-                    FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel);
+                    FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel)
+                            .addOnSuccessListener(aVoid -> {
+                                // NOVO: Adicionar usuários à lista de contatos um do outro
+                                addContact(FirebaseUtil.currentUserId(), otherUser.getUserId());
+                                addContact(otherUser.getUserId(), FirebaseUtil.currentUserId());
+                            });
                 }
             }
             updateToolbarUI();
             setupPinnedMessageUI();
         });
     }
+
+    private void addContact(String userId, String contactId) {
+        FirebaseUtil.allUserCollectionReference().document(userId).get().addOnSuccessListener(documentSnapshot -> {
+            UserModel user = documentSnapshot.toObject(UserModel.class);
+            if (user != null) {
+                List<String> contacts = user.getContacts();
+                if (contacts == null) {
+                    contacts = new ArrayList<>();
+                }
+                if (!contacts.contains(contactId)) {
+                    contacts.add(contactId);
+                    user.setContacts(contacts);
+                    FirebaseUtil.allUserCollectionReference().document(userId).set(user);
+                }
+            }
+        });
+    }
+
 
     private void updateToolbarUI() {
         if (isGroupChat) {
