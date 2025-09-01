@@ -17,8 +17,6 @@ public class ChatApplication extends Application implements Application.Activity
 
     @Override
     public void onActivityStarted(@NonNull android.app.Activity activity) {
-        // A lógica de verificação de status online/offline foi movida para locais mais apropriados
-        // para evitar o bloqueio na inicialização do app.
         if (FirebaseUtil.isLoggedIn()) {
             FirebaseUtil.currentUserDetails().update("userStatus", "online");
         }

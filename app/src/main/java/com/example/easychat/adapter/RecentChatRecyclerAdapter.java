@@ -34,19 +34,11 @@ public class RecentChatRecyclerAdapter extends FirestoreRecyclerAdapter<Chatroom
 
     @Override
     protected void onBindViewHolder(@NonNull ChatroomModelViewHolder holder, int position, @NonNull ChatroomModel model) {
+        holder.removeListeners(); // Limpa listeners antigos
 
-        // Limpa listeners antigos para evitar duplicação
-        if (holder.unreadCountListener != null) {
-            holder.unreadCountListener.remove();
-        }
-
-        boolean hasCustomNotif = model.getCustomNotificationStatus()
-                .getOrDefault(FirebaseUtil.currentUserId(), false);
-
-        // Atualiza a prévia da mensagem e o horário
-        boolean lastMessageSentByMe = model.getLastMessageSenderId().equals(FirebaseUtil.currentUserId());
-        String lastMessage = model.getLastMessage();
-        if(lastMessage == null) lastMessage = "";
+        // Lógica da última mensagem
+        String lastMessage = model.getLastMessage() != null ? model.getLastMessage() : "";
+        boolean lastMessageSentByMe = model.getLastMessageSenderId() != null && model.getLastMessageSenderId().equals(FirebaseUtil.currentUserId());
 
         if (lastMessageSentByMe && !model.isGroupChat()) {
             holder.lastMessageText.setText("You: " + lastMessage);
@@ -55,12 +47,12 @@ public class RecentChatRecyclerAdapter extends FirestoreRecyclerAdapter<Chatroom
         }
         holder.lastMessageTime.setText(FirebaseUtil.timestampToString(model.getLastMessageTimestamp()));
 
+        // Lógica para grupos vs. conversas individuais
         if (model.isGroupChat()) {
             holder.usernameText.setText(model.getGroupName());
             holder.profilePic.setImageResource(R.drawable.chat_icon);
             holder.statusIndicator.setVisibility(View.GONE);
             holder.unreadCountText.setVisibility(View.GONE);
-            holder.itemView.setBackground(ContextCompat.getDrawable(context, R.drawable.edit_text_rounded_corner));
 
             holder.itemView.setOnClickListener(v -> {
                 Intent intent = new Intent(context, ChatActivity.class);
@@ -71,63 +63,29 @@ public class RecentChatRecyclerAdapter extends FirestoreRecyclerAdapter<Chatroom
         } else {
             FirebaseUtil.getOtherUserFromChatroom(model.getUserIds())
                     .get().addOnSuccessListener(documentSnapshot -> {
-                        if (documentSnapshot.exists()) {
-                            UserModel otherUserModel = documentSnapshot.toObject(UserModel.class);
-                            if (otherUserModel == null) return;
+                        if (!documentSnapshot.exists()) return;
 
-                            holder.usernameText.setText(otherUserModel.getUsername());
-                            holder.statusIndicator.setVisibility(View.VISIBLE);
-                            if ("busy".equals(otherUserModel.getUserStatus())) {
-                                holder.statusIndicator.setImageResource(R.drawable.busy_indicator);
-                            } else if ("online".equals(otherUserModel.getUserStatus())) {
-                                holder.statusIndicator.setImageResource(R.drawable.online_indicator);
-                            } else {
-                                holder.statusIndicator.setImageResource(R.drawable.offline_indicator);
-                            }
-                            FirebaseUtil.getOtherProfilePicStorageRef(otherUserModel.getUserId()).getDownloadUrl()
-                                    .addOnCompleteListener(t -> {
-                                        if (t.isSuccessful()) {
-                                            Uri uri = t.getResult();
-                                            AndroidUtil.setProfilePic(context, uri, holder.profilePic);
-                                        }
-                                    });
+                        UserModel otherUserModel = documentSnapshot.toObject(UserModel.class);
+                        if (otherUserModel == null) return;
 
-                            // Listener para contagem de mensagens não lidas
-                            String chatroomId = FirebaseUtil.getChatroomId(FirebaseUtil.currentUserId(), otherUserModel.getUserId());
-                            holder.unreadCountListener = FirebaseUtil.getChatroomMessageReference(chatroomId)
-                                    .whereEqualTo("senderId", otherUserModel.getUserId())
-                                    .whereEqualTo("status", ChatMessageModel.STATUS_SENT)
-                                    .addSnapshotListener((querySnapshot, e) -> {
-                                        if (e != null) {
-                                            Log.e("RecentChatAdapter", "Listen failed.", e);
-                                            return;
-                                        }
+                        holder.usernameText.setText(otherUserModel.getUsername());
 
-                                        if (querySnapshot != null) {
-                                            int unreadCount = querySnapshot.size();
-                                            if (unreadCount > 0) {
-                                                holder.unreadCountText.setText(String.valueOf(unreadCount));
-                                                holder.unreadCountText.setVisibility(View.VISIBLE);
-                                            } else {
-                                                holder.unreadCountText.setVisibility(View.GONE);
-                                            }
+                        FirebaseUtil.getOtherProfilePicStorageRef(otherUserModel.getUserId()).getDownloadUrl()
+                                .addOnCompleteListener(t -> {
+                                    if (t.isSuccessful()) {
+                                        AndroidUtil.setProfilePic(context, t.getResult(), holder.profilePic);
+                                    }
+                                });
 
-                                            // Lógica de destaque da notificação
-                                            if (hasCustomNotif && unreadCount > 0) {
-                                                holder.itemView.setBackground(ContextCompat.getDrawable(context, R.drawable.list_item_background_highlight));
-                                            } else {
-                                                holder.itemView.setBackground(ContextCompat.getDrawable(context, R.drawable.edit_text_rounded_corner));
-                                            }
-                                        }
-                                    });
+                        // Anexa um listener para o chatroom que controlará o destaque e a contagem de não lidos
+                        holder.attachChatroomListener(model.getChatroomId(), otherUserModel.getUserId());
 
-                            holder.itemView.setOnClickListener(v -> {
-                                Intent intent = new Intent(context, ChatActivity.class);
-                                AndroidUtil.passUserModelAsIntent(intent, otherUserModel);
-                                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                                context.startActivity(intent);
-                            });
-                        }
+                        holder.itemView.setOnClickListener(v -> {
+                            Intent intent = new Intent(context, ChatActivity.class);
+                            AndroidUtil.passUserModelAsIntent(intent, otherUserModel);
+                            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            context.startActivity(intent);
+                        });
                     });
         }
     }
@@ -140,30 +98,16 @@ public class RecentChatRecyclerAdapter extends FirestoreRecyclerAdapter<Chatroom
     }
 
     @Override
-    public void onDetachedFromRecyclerView(@NonNull RecyclerView recyclerView) {
-        super.onDetachedFromRecyclerView(recyclerView);
-        // Limpa todos os listeners quando o adapter é desanexado
-        for (int i = 0; i < getItemCount(); i++) {
-            ChatroomModelViewHolder holder = (ChatroomModelViewHolder) recyclerView.findViewHolderForAdapterPosition(i);
-            if (holder != null && holder.unreadCountListener != null) {
-                holder.unreadCountListener.remove();
-            }
-        }
-    }
-
-    @Override
     public void onViewRecycled(@NonNull ChatroomModelViewHolder holder) {
         super.onViewRecycled(holder);
-        if (holder.unreadCountListener != null) {
-            holder.unreadCountListener.remove();
-            holder.unreadCountListener = null;
-        }
+        holder.removeListeners();
     }
 
     static class ChatroomModelViewHolder extends RecyclerView.ViewHolder {
         TextView usernameText, lastMessageText, lastMessageTime, unreadCountText;
         ImageView profilePic, statusIndicator;
         ListenerRegistration unreadCountListener;
+        ListenerRegistration chatroomListener; // Listener para o chatroom
 
         public ChatroomModelViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -173,6 +117,65 @@ public class RecentChatRecyclerAdapter extends FirestoreRecyclerAdapter<Chatroom
             profilePic = itemView.findViewById(R.id.profile_pic_image_view);
             unreadCountText = itemView.findViewById(R.id.unread_message_count_text);
             statusIndicator = itemView.findViewById(R.id.status_indicator);
+        }
+
+        void attachChatroomListener(String chatroomId, String otherUserId) {
+            chatroomListener = FirebaseUtil.getChatroomReference(chatroomId)
+                    .addSnapshotListener((snapshot, e) -> {
+                        if (e != null || snapshot == null || !snapshot.exists()) return;
+
+                        ChatroomModel chatroomModel = snapshot.toObject(ChatroomModel.class);
+                        if (chatroomModel == null) return;
+
+                        boolean hasCustomNotif = chatroomModel.getCustomNotificationStatus()
+                                .getOrDefault(FirebaseUtil.currentUserId(), false);
+
+                        // Agora, anexa ou reavalia a contagem de mensagens não lidas
+                        attachUnreadCountListener(chatroomId, otherUserId, hasCustomNotif);
+                    });
+        }
+
+        void attachUnreadCountListener(String chatroomId, String otherUserId, boolean hasCustomNotif) {
+            removeUnreadCountListener(); // Remove o listener antigo antes de adicionar um novo
+
+            unreadCountListener = FirebaseUtil.getChatroomMessageReference(chatroomId)
+                    .whereEqualTo("senderId", otherUserId)
+                    .whereEqualTo("status", ChatMessageModel.STATUS_SENT)
+                    .addSnapshotListener((querySnapshot, e) -> {
+                        if (e != null) return;
+
+                        if (querySnapshot != null) {
+                            int unreadCount = querySnapshot.size();
+                            if (unreadCount > 0) {
+                                unreadCountText.setText(String.valueOf(unreadCount));
+                                unreadCountText.setVisibility(View.VISIBLE);
+                            } else {
+                                unreadCountText.setVisibility(View.GONE);
+                            }
+
+                            // Lógica de destaque
+                            if (hasCustomNotif && unreadCount > 0) {
+                                itemView.setBackground(ContextCompat.getDrawable(itemView.getContext(), R.drawable.list_item_background_highlight));
+                            } else {
+                                itemView.setBackground(ContextCompat.getDrawable(itemView.getContext(), R.drawable.edit_text_rounded_corner));
+                            }
+                        }
+                    });
+        }
+
+        void removeListeners() {
+            removeUnreadCountListener();
+            if (chatroomListener != null) {
+                chatroomListener.remove();
+                chatroomListener = null;
+            }
+        }
+
+        void removeUnreadCountListener() {
+            if (unreadCountListener != null) {
+                unreadCountListener.remove();
+                unreadCountListener = null;
+            }
         }
     }
 }
