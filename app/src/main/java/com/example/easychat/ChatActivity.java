@@ -1,7 +1,6 @@
 package com.example.easychat;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -13,10 +12,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
-import android.text.Editable;
-import android.text.TextWatcher;
 import android.util.Log;
-import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -24,7 +20,6 @@ import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.bumptech.glide.Glide;
 import com.example.easychat.adapter.ChatRecyclerAdapter;
 import com.example.easychat.model.ChatMessageModel;
 import com.example.easychat.model.ChatroomModel;
@@ -34,7 +29,7 @@ import com.example.easychat.utils.FirebaseUtil;
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
 import com.github.dhaval2404.imagepicker.ImagePicker;
 import com.google.firebase.Timestamp;
-import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.WriteBatch;
@@ -72,13 +67,13 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
     ImageButton attachFileButton;
     ActivityResultLauncher<Intent> imagePickerLauncher;
     Uri selectedImageUri;
+    ListenerRegistration unreadMessagesListener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_chat);
 
-        // Inicialização de Views
         messageInput = findViewById(R.id.chat_message_input);
         sendMessageBtn = findViewById(R.id.message_send_btn);
         backBtn = findViewById(R.id.back_btn);
@@ -88,7 +83,6 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
         toolbar = findViewById(R.id.toolbar);
         attachFileButton = findViewById(R.id.attach_file_btn);
 
-        // Pega os dados da Intent
         otherUser = AndroidUtil.getUserModelFromIntent(getIntent());
         chatroomId = getIntent().getStringExtra("chatroomId");
 
@@ -96,13 +90,11 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
             chatroomId = FirebaseUtil.getChatroomId(FirebaseUtil.currentUserId(), otherUser.getUserId());
         }
 
-        cancelNotification();
-
         backBtn.setOnClickListener(v -> onBackPressed());
         sendMessageBtn.setOnClickListener(v -> {
             String message = messageInput.getText().toString().trim();
             if (message.isEmpty()) return;
-            sendMessage(message);
+            sendMessageToUser(message);
         });
 
         attachFileButton.setOnClickListener(v -> {
@@ -123,7 +115,7 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
             }
         });
 
-        getChatroomData();
+        getOrCreateChatroomModel();
         setupChatRecyclerView();
     }
 
@@ -132,6 +124,8 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
         super.onResume();
         if(chatroomId != null) {
             ChatActivityState.setActiveChatroomId(chatroomId);
+            cancelNotification();
+            setupUnreadMessagesListener();
         }
     }
 
@@ -139,57 +133,39 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
     protected void onPause() {
         super.onPause();
         ChatActivityState.clearActiveChatroomId();
+        if (unreadMessagesListener != null) {
+            unreadMessagesListener.remove();
+        }
+    }
+
+    private void setupUnreadMessagesListener() {
+        if (otherUser == null || chatroomId == null) return;
+
+        unreadMessagesListener = FirebaseUtil.getChatroomMessageReference(chatroomId)
+                .whereEqualTo("senderId", otherUser.getUserId())
+                .whereNotEqualTo("status", ChatMessageModel.STATUS_READ)
+                .addSnapshotListener((queryDocumentSnapshots, e) -> {
+                    if (e != null) {
+                        Log.e("ChatActivity", "Listen for unread messages failed.", e);
+                        return;
+                    }
+
+                    if (queryDocumentSnapshots != null && !queryDocumentSnapshots.isEmpty()) {
+                        WriteBatch batch = FirebaseUtil.getFirestore().batch();
+                        for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
+                            batch.update(doc.getReference(), "status", ChatMessageModel.STATUS_READ);
+                        }
+                        batch.commit().addOnFailureListener(fail ->
+                                Log.e("ChatActivity", "Failed to mark messages as read", fail)
+                        );
+                    }
+                });
     }
 
     private void cancelNotification() {
         if (chatroomId != null) {
             NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             notificationManager.cancel(chatroomId.hashCode());
-        }
-    }
-
-    private void getChatroomData() {
-        FirebaseUtil.getChatroomReference(chatroomId).addSnapshotListener((snapshot, e) -> {
-            if (e != null) {
-                Log.e("ChatActivity", "Error fetching chatroom data", e);
-                return;
-            }
-
-            if (snapshot != null && snapshot.exists()) {
-                chatroomModel = snapshot.toObject(ChatroomModel.class);
-            } else {
-                if (!FirebaseUtil.isGroupChat(chatroomId) && otherUser != null) {
-                    chatroomModel = new ChatroomModel(
-                            chatroomId,
-                            Arrays.asList(FirebaseUtil.currentUserId(), otherUser.getUserId()),
-                            Timestamp.now(), "", "", false
-                    );
-                    FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel);
-                }
-            }
-
-            if (chatroomModel == null) return;
-
-            markMessagesAsRead();
-            updateUI();
-        });
-    }
-
-    private void updateUI() {
-        if (otherUser != null) {
-            toolbarTitle.setText(otherUser.getUsername());
-            FirebaseUtil.getOtherProfilePicStorageRef(otherUser.getUserId()).getDownloadUrl()
-                    .addOnCompleteListener(t -> {
-                        if (t.isSuccessful()) {
-                            Uri uri = t.getResult();
-                            AndroidUtil.setProfilePic(this, uri, toolbarProfilePic);
-                        }
-                    });
-            toolbar.setOnClickListener(v -> {
-                Intent intent = new Intent(this, UserSettingsActivity.class);
-                AndroidUtil.passUserModelAsIntent(intent, otherUser);
-                startActivity(intent);
-            });
         }
     }
 
@@ -216,27 +192,7 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
         });
     }
 
-    private void markMessagesAsRead() {
-        if (otherUser == null || chatroomId == null) return;
-
-        FirebaseUtil.getChatroomMessageReference(chatroomId)
-                .whereEqualTo("senderId", otherUser.getUserId())
-                .whereNotEqualTo("status", ChatMessageModel.STATUS_READ)
-                .get()
-                .addOnSuccessListener(queryDocumentSnapshots -> {
-                    if (queryDocumentSnapshots.isEmpty()) return;
-
-                    WriteBatch batch = FirebaseUtil.allChatroomCollectionReference().getFirestore().batch();
-                    for (QueryDocumentSnapshot doc : queryDocumentSnapshots) {
-                        batch.update(doc.getReference(), "status", ChatMessageModel.STATUS_READ);
-                    }
-                    batch.commit().addOnFailureListener(e ->
-                            Log.e("ChatActivity", "Failed to mark messages as read", e)
-                    );
-                });
-    }
-
-    private void sendMessage(String message) {
+    private void sendMessageToUser(String message) {
         if (chatroomModel == null) return;
         chatroomModel.setLastMessageTimestamp(Timestamp.now());
         chatroomModel.setLastMessageSenderId(FirebaseUtil.currentUserId());
@@ -244,15 +200,52 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
         FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel);
 
         List<String> keywords = generateKeywords(message);
-        ChatMessageModel chatMessageModel = new ChatMessageModel(message, FirebaseUtil.currentUserId(), Timestamp.now(), ChatMessageModel.STATUS_SENT, keywords, "text");
+        ChatMessageModel chatMessage = new ChatMessageModel(message, FirebaseUtil.currentUserId(), Timestamp.now(), ChatMessageModel.STATUS_SENT, keywords, "text");
 
-        FirebaseUtil.getChatroomMessageReference(chatroomId).add(chatMessageModel)
+        FirebaseUtil.getChatroomMessageReference(chatroomId).add(chatMessage)
                 .addOnCompleteListener(task -> {
                     if (task.isSuccessful()) {
                         messageInput.setText("");
                         sendNotification(message);
                     }
                 });
+    }
+
+    private void getOrCreateChatroomModel() {
+        FirebaseUtil.getChatroomReference(chatroomId).get().addOnCompleteListener(task -> {
+            if (task.isSuccessful()) {
+                chatroomModel = task.getResult().toObject(ChatroomModel.class);
+                if (chatroomModel == null) {
+                    chatroomModel = new ChatroomModel(
+                            chatroomId,
+                            Arrays.asList(FirebaseUtil.currentUserId(), otherUser.getUserId()),
+                            Timestamp.now(),
+                            "", "", false
+                    );
+                    FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel);
+                }
+                updateToolbarUI();
+            }
+        });
+    }
+
+    private void updateToolbarUI() {
+        if (otherUser != null) {
+            toolbarTitle.setText(otherUser.getUsername());
+            FirebaseUtil.getOtherProfilePicStorageRef(otherUser.getUserId()).getDownloadUrl()
+                    .addOnCompleteListener(t -> {
+                        if (t.isSuccessful()) {
+                            Uri uri = t.getResult();
+                            AndroidUtil.setProfilePic(this, uri, toolbarProfilePic);
+                        }
+                    });
+            toolbar.setOnClickListener(v -> {
+                Intent intent = new Intent(this, UserSettingsActivity.class);
+                AndroidUtil.passUserModelAsIntent(intent, otherUser);
+                intent.putExtra("chatroomId", chatroomId);
+                startActivity(intent);
+            });
+        }
     }
 
     void sendNotification(String message) {
@@ -281,18 +274,15 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
         });
     }
 
-    // As funções abaixo (upload de imagem, API call, etc.) não precisam de alteração
     void uploadImageToFirebase() {
         if (selectedImageUri == null) return;
         String imageId = "img_" + System.currentTimeMillis();
         StorageReference storageRef = FirebaseStorage.getInstance().getReference().child("chat_images").child(chatroomId).child(imageId);
 
         storageRef.putFile(selectedImageUri)
-                .addOnSuccessListener(taskSnapshot -> {
-                    storageRef.getDownloadUrl().addOnSuccessListener(uri -> {
-                        sendImageMessage(uri.toString());
-                    });
-                })
+                .addOnSuccessListener(taskSnapshot -> storageRef.getDownloadUrl().addOnSuccessListener(uri -> {
+                    sendImageMessage(uri.toString());
+                }))
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "Falha no upload da imagem.", Toast.LENGTH_LONG).show();
                 });
@@ -305,16 +295,16 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
         chatroomModel.setLastMessage("Imagem");
         FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel);
 
-        ChatMessageModel chatMessageModel = new ChatMessageModel(imageUrl, FirebaseUtil.currentUserId(), Timestamp.now(), ChatMessageModel.STATUS_SENT, new ArrayList<>(), "image");
+        ChatMessageModel chatMessage = new ChatMessageModel(imageUrl, FirebaseUtil.currentUserId(), Timestamp.now(), ChatMessageModel.STATUS_SENT, new ArrayList<>(), "image");
 
-        FirebaseUtil.getChatroomMessageReference(chatroomId).add(chatMessageModel);
+        FirebaseUtil.getChatroomMessageReference(chatroomId).add(chatMessage);
     }
 
     private List<String> generateKeywords(String text) {
         String searchableString = text.toLowerCase().replaceAll("[^a-zA-Z0-9\\s]", "");
         List<String> keywords = new ArrayList<>();
         for (String word : searchableString.split("\\s+")) {
-            if (word.length() > 0) {
+            if (!word.isEmpty()) {
                 for (int i = 1; i <= word.length(); i++) {
                     keywords.add(word.substring(0, i));
                 }

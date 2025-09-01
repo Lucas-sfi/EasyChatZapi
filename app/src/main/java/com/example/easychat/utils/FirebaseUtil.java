@@ -13,6 +13,11 @@ import java.util.List;
 
 public class FirebaseUtil {
 
+    // Adicionado para corrigir o erro de compilação
+    public static FirebaseFirestore getFirestore() {
+        return FirebaseFirestore.getInstance();
+    }
+
     public static String currentUserId(){
         return FirebaseAuth.getInstance().getUid();
     }
@@ -25,15 +30,15 @@ public class FirebaseUtil {
     }
 
     public static DocumentReference currentUserDetails(){
-        return FirebaseFirestore.getInstance().collection("users").document(currentUserId());
+        return getFirestore().collection("users").document(currentUserId());
     }
 
     public static CollectionReference allUserCollectionReference(){
-        return FirebaseFirestore.getInstance().collection("users");
+        return getFirestore().collection("users");
     }
 
     public static DocumentReference getChatroomReference(String chatroomId){
-        return FirebaseFirestore.getInstance().collection("chatrooms").document(chatroomId);
+        return getFirestore().collection("chatrooms").document(chatroomId);
     }
 
     public static CollectionReference getChatroomMessageReference(String chatroomId){
@@ -49,7 +54,7 @@ public class FirebaseUtil {
     }
 
     public static CollectionReference allChatroomCollectionReference(){
-        return FirebaseFirestore.getInstance().collection("chatrooms");
+        return getFirestore().collection("chatrooms");
     }
 
     public static DocumentReference getOtherUserFromChatroom(List<String> userIds){
@@ -79,8 +84,6 @@ public class FirebaseUtil {
     }
 
     public static boolean isGroupChat(String chatroomId) {
-        // Se o ID do chat contém "_", é um chat individual.
-        // IDs de grupo gerados aleatoriamente pelo Firestore não contêm "_".
         return !chatroomId.contains("_");
     }
 }
