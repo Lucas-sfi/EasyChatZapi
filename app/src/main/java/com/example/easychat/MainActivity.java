@@ -80,23 +80,26 @@ public class MainActivity extends AppCompatActivity {
     private void handleNotificationIntent() {
         if (getIntent().getExtras() != null && getIntent().hasExtra("chatroomId")) {
             String chatroomId = getIntent().getStringExtra("chatroomId");
-            String userId = getIntent().getStringExtra("userId");
-            String username = getIntent().getStringExtra("username");
+            boolean isGroupChat = getIntent().getBooleanExtra("isGroupChat", false);
 
-            UserModel userModel = new UserModel();
-            userModel.setUserId(userId);
-            userModel.setUsername(username);
+            Intent chatIntent = new Intent(this, ChatActivity.class);
+            chatIntent.putExtra("chatroomId", chatroomId);
+            chatIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
-            FirebaseUtil.allUserCollectionReference().document(userId).get().addOnSuccessListener(documentSnapshot -> {
-                UserModel fullUserModel = documentSnapshot.toObject(UserModel.class);
-                if (fullUserModel != null) {
-                    Intent chatIntent = new Intent(this, ChatActivity.class);
-                    AndroidUtil.passUserModelAsIntent(chatIntent, fullUserModel);
-                    chatIntent.putExtra("chatroomId", chatroomId);
-                    chatIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    startActivity(chatIntent);
-                }
-            });
+            if (isGroupChat) {
+                chatIntent.putExtra("isGroupChat", true);
+                chatIntent.putExtra("groupName", getIntent().getStringExtra("groupName"));
+                startActivity(chatIntent);
+            } else {
+                String userId = getIntent().getStringExtra("userId");
+                FirebaseUtil.allUserCollectionReference().document(userId).get().addOnSuccessListener(documentSnapshot -> {
+                    UserModel userModel = documentSnapshot.toObject(UserModel.class);
+                    if (userModel != null) {
+                        AndroidUtil.passUserModelAsIntent(chatIntent, userModel);
+                        startActivity(chatIntent);
+                    }
+                });
+            }
         }
     }
 

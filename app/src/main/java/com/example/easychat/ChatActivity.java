@@ -58,6 +58,9 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
     String chatroomId;
     ChatroomModel chatroomModel;
     UserModel otherUser;
+    boolean isGroupChat;
+    String groupName;
+
     ChatRecyclerAdapter adapter;
     EditText messageInput;
     ImageButton sendMessageBtn;
@@ -92,15 +95,17 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
         toolbar = findViewById(R.id.toolbar);
         attachFileButton = findViewById(R.id.attach_file_btn);
 
-        // Referências para a UI de mensagem fixada
         pinnedMessageLayout = findViewById(R.id.pinned_message_layout);
         pinnedMessageText = findViewById(R.id.pinned_message_text);
         unpinBtn = findViewById(R.id.unpin_btn);
 
-        otherUser = AndroidUtil.getUserModelFromIntent(getIntent());
-        chatroomId = getIntent().getStringExtra("chatroomId");
-
-        if (chatroomId == null && otherUser != null) {
+        // Verifica se é um grupo ou chat individual
+        isGroupChat = getIntent().getBooleanExtra("isGroupChat", false);
+        if (isGroupChat) {
+            groupName = getIntent().getStringExtra("groupName");
+            chatroomId = getIntent().getStringExtra("chatroomId");
+        } else {
+            otherUser = AndroidUtil.getUserModelFromIntent(getIntent());
             chatroomId = FirebaseUtil.getChatroomId(FirebaseUtil.currentUserId(), otherUser.getUserId());
         }
 
@@ -153,7 +158,7 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
     }
 
     private void setupUnreadMessagesListener() {
-        if (otherUser == null || chatroomId == null) return;
+        if (isGroupChat || otherUser == null || chatroomId == null) return;
 
         unreadMessagesListener = FirebaseUtil.getChatroomMessageReference(chatroomId)
                 .whereEqualTo("senderId", otherUser.getUserId())
@@ -275,7 +280,9 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
                 .addOnCompleteListener(task -> {
                     if (task.isSuccessful()) {
                         messageInput.setText("");
-                        sendNotification(message);
+                        if (!isGroupChat) {
+                            sendNotification(message);
+                        }
                     }
                 });
     }
@@ -288,13 +295,15 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
             if (snapshot != null && snapshot.exists()) {
                 chatroomModel = snapshot.toObject(ChatroomModel.class);
             } else {
-                chatroomModel = new ChatroomModel(
-                        chatroomId,
-                        Arrays.asList(FirebaseUtil.currentUserId(), otherUser.getUserId()),
-                        Timestamp.now(),
-                        "", "", false
-                );
-                FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel);
+                if(!isGroupChat) {
+                    chatroomModel = new ChatroomModel(
+                            chatroomId,
+                            Arrays.asList(FirebaseUtil.currentUserId(), otherUser.getUserId()),
+                            Timestamp.now(),
+                            "", "", false
+                    );
+                    FirebaseUtil.getChatroomReference(chatroomId).set(chatroomModel);
+                }
             }
             updateToolbarUI();
             setupPinnedMessageUI();
@@ -302,43 +311,54 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
     }
 
     private void updateToolbarUI() {
-        if (otherUser != null) {
-            FirebaseUtil.allUserCollectionReference().document(otherUser.getUserId()).addSnapshotListener((value, error) -> {
-                if (error != null || value == null) {
-                    return;
-                }
-                UserModel updatedOtherUser = value.toObject(UserModel.class);
-                if (updatedOtherUser != null) {
-                    toolbarTitle.setText(updatedOtherUser.getUsername());
-
-                    statusIndicator.setVisibility(View.VISIBLE);
-                    switch (updatedOtherUser.getUserStatus()) {
-                        case "online":
-                            statusIndicator.setImageResource(R.drawable.online_indicator);
-                            break;
-                        case "busy":
-                            statusIndicator.setImageResource(R.drawable.busy_indicator);
-                            break;
-                        default:
-                            statusIndicator.setImageResource(R.drawable.offline_indicator);
-                            break;
-                    }
-                }
-            });
-
-            FirebaseUtil.getOtherProfilePicStorageRef(otherUser.getUserId()).getDownloadUrl()
-                    .addOnCompleteListener(t -> {
-                        if (t.isSuccessful()) {
-                            Uri uri = t.getResult();
-                            AndroidUtil.setProfilePic(this, uri, toolbarProfilePic);
-                        }
-                    });
+        if (isGroupChat) {
+            toolbarTitle.setText(groupName);
+            toolbarProfilePic.setImageResource(R.drawable.chat_icon);
+            statusIndicator.setVisibility(View.GONE);
             toolbar.setOnClickListener(v -> {
-                Intent intent = new Intent(this, UserSettingsActivity.class);
-                AndroidUtil.passUserModelAsIntent(intent, otherUser);
+                Intent intent = new Intent(this, GroupSettingsActivity.class);
                 intent.putExtra("chatroomId", chatroomId);
                 startActivity(intent);
             });
+        } else {
+            if (otherUser != null) {
+                FirebaseUtil.allUserCollectionReference().document(otherUser.getUserId()).addSnapshotListener((value, error) -> {
+                    if (error != null || value == null) {
+                        return;
+                    }
+                    UserModel updatedOtherUser = value.toObject(UserModel.class);
+                    if (updatedOtherUser != null) {
+                        toolbarTitle.setText(updatedOtherUser.getUsername());
+
+                        statusIndicator.setVisibility(View.VISIBLE);
+                        switch (updatedOtherUser.getUserStatus()) {
+                            case "online":
+                                statusIndicator.setImageResource(R.drawable.online_indicator);
+                                break;
+                            case "busy":
+                                statusIndicator.setImageResource(R.drawable.busy_indicator);
+                                break;
+                            default:
+                                statusIndicator.setImageResource(R.drawable.offline_indicator);
+                                break;
+                        }
+                    }
+                });
+
+                FirebaseUtil.getOtherProfilePicStorageRef(otherUser.getUserId()).getDownloadUrl()
+                        .addOnCompleteListener(t -> {
+                            if (t.isSuccessful()) {
+                                Uri uri = t.getResult();
+                                AndroidUtil.setProfilePic(this, uri, toolbarProfilePic);
+                            }
+                        });
+                toolbar.setOnClickListener(v -> {
+                    Intent intent = new Intent(this, UserSettingsActivity.class);
+                    AndroidUtil.passUserModelAsIntent(intent, otherUser);
+                    intent.putExtra("chatroomId", chatroomId);
+                    startActivity(intent);
+                });
+            }
         }
     }
 

@@ -55,6 +55,8 @@ public class RecentChatRecyclerAdapter extends FirestoreRecyclerAdapter<Chatroom
             holder.itemView.setOnClickListener(v -> {
                 Intent intent = new Intent(context, ChatActivity.class);
                 intent.putExtra("chatroomId", model.getChatroomId());
+                intent.putExtra("isGroupChat", true); // Informa que é um grupo
+                intent.putExtra("groupName", model.getGroupName()); // Passa o nome do grupo
                 intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 context.startActivity(intent);
             });

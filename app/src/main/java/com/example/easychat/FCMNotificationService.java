@@ -22,12 +22,8 @@ public class FCMNotificationService extends FirebaseMessagingService {
             return;
         }
 
-        String title = remoteMessage.getNotification().getTitle();
-        String body = remoteMessage.getNotification().getBody();
-        String userId = remoteMessage.getData().get("userId");
         String chatroomId = remoteMessage.getData().get("chatroomId");
-
-        if (userId == null || chatroomId == null) {
+        if (chatroomId == null) {
             return;
         }
 
@@ -35,15 +31,25 @@ public class FCMNotificationService extends FirebaseMessagingService {
             return;
         }
 
-        int notificationId = chatroomId.hashCode();
+        String title = remoteMessage.getNotification().getTitle();
+        String body = remoteMessage.getNotification().getBody();
+        String isGroupChatStr = remoteMessage.getData().get("isGroupChat");
+        boolean isGroupChat = "true".equals(isGroupChatStr);
 
-        // Ponto chave: A Intent agora aponta para a MainActivity.
         Intent intent = new Intent(this, MainActivity.class);
-        intent.putExtra("userId", userId);
         intent.putExtra("chatroomId", chatroomId);
-        intent.putExtra("username", title); // Passamos o nome de usuário para evitar buscas extras
+
+        if (isGroupChat) {
+            intent.putExtra("isGroupChat", true);
+            intent.putExtra("groupName", remoteMessage.getData().get("groupName"));
+        } else {
+            intent.putExtra("userId", remoteMessage.getData().get("userId"));
+            intent.putExtra("username", title);
+        }
+
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
 
+        int notificationId = chatroomId.hashCode();
         PendingIntent pendingIntent = PendingIntent.getActivity(this, notificationId, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
@@ -53,7 +59,7 @@ public class FCMNotificationService extends FirebaseMessagingService {
                 .setSmallIcon(R.drawable.chat_icon)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setContentIntent(pendingIntent)
-                .setAutoCancel(true); // O sistema cancela a notificação ao ser tocada
+                .setAutoCancel(true);
 
         NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
 
