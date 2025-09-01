@@ -20,6 +20,7 @@ import com.example.easychat.utils.AndroidUtil;
 import com.example.easychat.utils.FirebaseUtil;
 import com.firebase.ui.firestore.FirestoreRecyclerAdapter;
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
+import com.google.firebase.firestore.ListenerRegistration;
 
 public class RecentChatRecyclerAdapter extends FirestoreRecyclerAdapter<ChatroomModel, RecentChatRecyclerAdapter.ChatroomModelViewHolder> {
 
@@ -40,12 +41,29 @@ public class RecentChatRecyclerAdapter extends FirestoreRecyclerAdapter<Chatroom
         boolean hasCustomNotif = model.getCustomNotificationStatus()
                 .getOrDefault(FirebaseUtil.currentUserId(), false);
 
+        if (holder.unreadCountListener != null) {
+            holder.unreadCountListener.remove();
+        }
+
+        // CORREÇÃO: ATUALIZA A PRÉVIA DA MENSAGEM E O HORÁRIO IMEDIATAMENTE
+        boolean lastMessageSentByMe = model.getLastMessageSenderId().equals(FirebaseUtil.currentUserId());
+        String lastMessage = model.getLastMessage();
+
+        // Garante que a prévia não seja nula ou vazia
+        if(lastMessage == null) lastMessage = "";
+
+        // Adiciona "You: " para mensagens enviadas em chats individuais
+        if (lastMessageSentByMe && !model.isGroupChat()) {
+            holder.lastMessageText.setText("You: " + lastMessage);
+        } else {
+            holder.lastMessageText.setText(lastMessage);
+        }
+        holder.lastMessageTime.setText(FirebaseUtil.timestampToString(model.getLastMessageTimestamp()));
+
         if (model.isGroupChat()) {
             holder.usernameText.setText(model.getGroupName());
             holder.profilePic.setImageResource(R.drawable.chat_icon);
             holder.statusIndicator.setVisibility(View.GONE);
-            holder.lastMessageTime.setText(FirebaseUtil.timestampToString(model.getLastMessageTimestamp()));
-            holder.lastMessageText.setText(model.getLastMessage());
             holder.unreadCountText.setVisibility(View.GONE);
             holder.itemView.setBackground(ContextCompat.getDrawable(context, R.drawable.edit_text_rounded_corner));
         } else {
@@ -53,7 +71,9 @@ public class RecentChatRecyclerAdapter extends FirestoreRecyclerAdapter<Chatroom
                     .get().addOnSuccessListener(documentSnapshot -> {
                         if (documentSnapshot.exists()) {
                             UserModel otherUserModel = documentSnapshot.toObject(UserModel.class);
+                            if (otherUserModel == null) return;
 
+                            holder.usernameText.setText(otherUserModel.getUsername());
                             holder.statusIndicator.setVisibility(View.VISIBLE);
                             if ("busy".equals(otherUserModel.getUserStatus())) {
                                 holder.statusIndicator.setImageResource(R.drawable.busy_indicator);
@@ -62,10 +82,6 @@ public class RecentChatRecyclerAdapter extends FirestoreRecyclerAdapter<Chatroom
                             } else {
                                 holder.statusIndicator.setImageResource(R.drawable.offline_indicator);
                             }
-
-                            AndroidUtil.passUserModelAsIntent(intent, otherUserModel);
-                            boolean lastMessageSentByMe = model.getLastMessageSenderId().equals(FirebaseUtil.currentUserId());
-
                             FirebaseUtil.getOtherProfilePicStorageRef(otherUserModel.getUserId()).getDownloadUrl()
                                     .addOnCompleteListener(t -> {
                                         if (t.isSuccessful()) {
@@ -74,33 +90,27 @@ public class RecentChatRecyclerAdapter extends FirestoreRecyclerAdapter<Chatroom
                                         }
                                     });
 
-                            holder.usernameText.setText(otherUserModel.getUsername());
-                            if (lastMessageSentByMe) holder.lastMessageText.setText("You: " + model.getLastMessage());
-                            else holder.lastMessageText.setText(model.getLastMessage());
-                            holder.lastMessageTime.setText(FirebaseUtil.timestampToString(model.getLastMessageTimestamp()));
+                            AndroidUtil.passUserModelAsIntent(intent, otherUserModel);
 
-                            // CORREÇÃO: Lógica de contagem agora usa um Listener
                             String chatroomId = FirebaseUtil.getChatroomId(FirebaseUtil.currentUserId(), otherUserModel.getUserId());
-                            FirebaseUtil.getChatroomMessageReference(chatroomId)
+                            holder.unreadCountListener = FirebaseUtil.getChatroomMessageReference(chatroomId)
                                     .whereEqualTo("senderId", otherUserModel.getUserId())
                                     .whereEqualTo("status", ChatMessageModel.STATUS_SENT)
                                     .addSnapshotListener((querySnapshot, e) -> {
-                                        if (e != null) { return; }
+                                        if (e != null || querySnapshot == null) return;
 
-                                        if (querySnapshot != null) {
-                                            int unreadCount = querySnapshot.size();
-                                            if (unreadCount > 0) {
-                                                holder.unreadCountText.setText(String.valueOf(unreadCount));
-                                                holder.unreadCountText.setVisibility(View.VISIBLE);
-                                            } else {
-                                                holder.unreadCountText.setVisibility(View.GONE);
-                                            }
-                                            // Lógica para o destaque da notificação personalizada
-                                            if (hasCustomNotif && unreadCount > 0) {
-                                                holder.itemView.setBackground(ContextCompat.getDrawable(context, R.drawable.list_item_background_highlight));
-                                            } else {
-                                                holder.itemView.setBackground(ContextCompat.getDrawable(context, R.drawable.edit_text_rounded_corner));
-                                            }
+                                        int unreadCount = querySnapshot.size();
+                                        if (unreadCount > 0) {
+                                            holder.unreadCountText.setText(String.valueOf(unreadCount));
+                                            holder.unreadCountText.setVisibility(View.VISIBLE);
+                                        } else {
+                                            holder.unreadCountText.setVisibility(View.GONE);
+                                        }
+
+                                        if (hasCustomNotif && unreadCount > 0) {
+                                            holder.itemView.setBackground(ContextCompat.getDrawable(context, R.drawable.list_item_background_highlight));
+                                        } else {
+                                            holder.itemView.setBackground(ContextCompat.getDrawable(context, R.drawable.edit_text_rounded_corner));
                                         }
                                     });
                         }
@@ -117,9 +127,18 @@ public class RecentChatRecyclerAdapter extends FirestoreRecyclerAdapter<Chatroom
         return new ChatroomModelViewHolder(view);
     }
 
+    @Override
+    public void onViewRecycled(@NonNull ChatroomModelViewHolder holder) {
+        super.onViewRecycled(holder);
+        if (holder.unreadCountListener != null) {
+            holder.unreadCountListener.remove();
+        }
+    }
+
     static class ChatroomModelViewHolder extends RecyclerView.ViewHolder {
         TextView usernameText, lastMessageText, lastMessageTime, unreadCountText;
         ImageView profilePic, statusIndicator;
+        ListenerRegistration unreadCountListener;
 
         public ChatroomModelViewHolder(@NonNull View itemView) {
             super(itemView);

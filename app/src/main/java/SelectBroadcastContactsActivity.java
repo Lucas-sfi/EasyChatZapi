@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.easychat.adapter.SelectUserRecyclerAdapter;
+import com.example.easychat.model.ChatroomModel;
 import com.example.easychat.model.UserModel;
 import com.example.easychat.utils.FirebaseUtil;
 import com.firebase.ui.firestore.FirestoreRecyclerOptions;
@@ -17,6 +18,7 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.firebase.firestore.Query;
 
 import java.util.ArrayList;
+import java.util.List;
 
 public class SelectBroadcastContactsActivity extends AppCompatActivity {
 
@@ -39,6 +41,10 @@ public class SelectBroadcastContactsActivity extends AppCompatActivity {
         backButton.setOnClickListener(v -> onBackPressed());
 
         nextButton.setOnClickListener(v -> {
+            if (adapter == null) {
+                Toast.makeText(this, "Nenhum contato selecionado.", Toast.LENGTH_SHORT).show();
+                return;
+            }
             ArrayList<String> selectedIds = adapter.getSelectedUserIds();
             if (selectedIds.size() < 2) {
                 Toast.makeText(this, "Selecione pelo menos 2 contatos", Toast.LENGTH_SHORT).show();
@@ -52,15 +58,39 @@ public class SelectBroadcastContactsActivity extends AppCompatActivity {
     }
 
     private void setupRecyclerView() {
-        Query query = FirebaseUtil.allUserCollectionReference()
-                .whereNotEqualTo("userId", FirebaseUtil.currentUserId());
+        FirebaseUtil.allChatroomCollectionReference()
+                .whereArrayContains("userIds", FirebaseUtil.currentUserId())
+                .get().addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        List<String> contactIds = new ArrayList<>();
+                        for (ChatroomModel chatroom : task.getResult().toObjects(ChatroomModel.class)) {
+                            // Garante que estamos pegando contatos apenas de conversas individuais
+                            if (!chatroom.isGroupChat()) {
+                                for (String userId : chatroom.getUserIds()) {
+                                    if (!userId.equals(FirebaseUtil.currentUserId())) {
+                                        contactIds.add(userId);
+                                    }
+                                }
+                            }
+                        }
 
-        FirestoreRecyclerOptions<UserModel> options = new FirestoreRecyclerOptions.Builder<UserModel>()
-                .setQuery(query, UserModel.class).build();
+                        if (!contactIds.isEmpty()) {
+                            Query query = FirebaseUtil.allUserCollectionReference()
+                                    .whereIn("userId", contactIds);
 
-        adapter = new SelectUserRecyclerAdapter(options, getApplicationContext(), new ArrayList<>());
-        recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        recyclerView.setAdapter(adapter);
+                            FirestoreRecyclerOptions<UserModel> options = new FirestoreRecyclerOptions.Builder<UserModel>()
+                                    .setQuery(query, UserModel.class).build();
+
+                            // Passamos um new ArrayList<>() porque na lista de transmissão não há "membros atuais" a serem desabilitados
+                            adapter = new SelectUserRecyclerAdapter(options, getApplicationContext(), new ArrayList<>());
+                            recyclerView.setLayoutManager(new LinearLayoutManager(this));
+                            recyclerView.setAdapter(adapter);
+                            adapter.startListening();
+                        } else {
+                            Toast.makeText(this, "Você não tem contatos para criar uma lista de transmissão.", Toast.LENGTH_LONG).show();
+                        }
+                    }
+                });
     }
 
     @Override

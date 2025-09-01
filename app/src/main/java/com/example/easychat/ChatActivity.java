@@ -9,6 +9,8 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import android.app.Activity;
 
+import android.app.NotificationManager;
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -168,6 +170,33 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        if(chatroomId != null) {
+            ChatActivityState.setActiveChatroomId(chatroomId);
+            markMessagesAsRead();
+            cancelNotification(); // Cancela a notificação sempre que a tela fica visível
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        ChatActivityState.clearActiveChatroomId();
+        if (messageReadListener != null) {
+            messageReadListener.remove();
+            messageReadListener = null;
+        }
+    }
+
+    private void cancelNotification() {
+        if (chatroomId != null) {
+            NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            notificationManager.cancel(chatroomId.hashCode());
+        }
+    }
+
+    @Override
     public void onPinMessageClicked(String messageId) {
         if (chatroomModel != null) {
             chatroomModel.setPinnedMessageId(messageId);
@@ -205,12 +234,10 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
                             otherUser = documentSnapshot.toObject(UserModel.class);
                             updateUI();
                             setupChatRecyclerView();
-                            markMessagesAsRead();
                         });
             } else {
                 updateUI();
                 setupChatRecyclerView();
-                markMessagesAsRead();
             }
         });
     }
@@ -273,7 +300,7 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
 
             adapter = new ChatRecyclerAdapter(options, this, this);
             LinearLayoutManager manager = new LinearLayoutManager(this);
-            manager.setStackFromEnd(true); // Garante que a view comece do final
+            manager.setStackFromEnd(true);
             recyclerView.setLayoutManager(manager);
             recyclerView.setAdapter(adapter);
             adapter.startListening();
@@ -346,10 +373,6 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
 
     private void markMessagesAsRead() {
         if (chatroomModel != null && !chatroomModel.isGroupChat() && otherUser != null) {
-            if (messageReadListener != null) {
-                messageReadListener.remove();
-            }
-
             messageReadListener = FirebaseUtil.getChatroomMessageReference(chatroomId)
                     .whereEqualTo("senderId", otherUser.getUserId())
                     .whereEqualTo("status", ChatMessageModel.STATUS_SENT)
@@ -364,29 +387,13 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
         }
     }
 
-    @Override
-    protected void onStop() {
-        super.onStop();
-        if (messageReadListener != null) {
-            messageReadListener.remove();
-        }
-    }
+    private void searchInChat(String searchTerm) {}
 
-    private void searchInChat(String searchTerm) {
-        // Lógica de busca
-    }
+    private void navigateSearchResults(boolean down) {}
 
-    private void navigateSearchResults(boolean down) {
-        // Lógica de navegação
-    }
+    private void navigateToCurrentSearchResult() {}
 
-    private void navigateToCurrentSearchResult() {
-        // Lógica de navegação
-    }
-
-    private void clearSearch() {
-        // Lógica de limpeza
-    }
+    private void clearSearch() {}
 
     private List<String> generateKeywords(String text) {
         String searchableString = text.toLowerCase().replaceAll("[^a-zA-Z0-9\\s]", "");
@@ -435,6 +442,7 @@ public class ChatActivity extends AppCompatActivity implements ChatRecyclerAdapt
                     notificationObj.put("body", message);
                     JSONObject dataObj = new JSONObject();
                     dataObj.put("userId", currentUser.getUserId());
+                    dataObj.put("chatroomId", chatroomId);
                     jsonObject.put("notification", notificationObj);
                     jsonObject.put("data", dataObj);
                     jsonObject.put("to", otherUser.getFcmToken());

@@ -6,11 +6,8 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
-import android.util.Log;
-
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
-
 import com.example.easychat.model.UserModel;
 import com.example.easychat.utils.AndroidUtil;
 import com.example.easychat.utils.FirebaseUtil;
@@ -23,46 +20,51 @@ public class FCMNotificationService extends FirebaseMessagingService {
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
         super.onMessageReceived(remoteMessage);
 
-        // Extrair dados da notificação
+        if (remoteMessage.getNotification() == null) return;
+
         String title = remoteMessage.getNotification().getTitle();
         String body = remoteMessage.getNotification().getBody();
         String userId = remoteMessage.getData().get("userId");
+        String chatroomId = remoteMessage.getData().get("chatroomId");
 
-        if (userId == null) return;
+        if (userId == null || chatroomId == null) return;
 
-        // Buscar os detalhes do usuário que enviou a mensagem
+        if (chatroomId.equals(ChatActivityState.getActiveChatroomId())) {
+            return;
+        }
+
+        // Usa um ID numérico consistente baseado no chatroomId
+        int notificationId = chatroomId.hashCode();
+
         FirebaseUtil.allUserCollectionReference().document(userId).get()
                 .addOnCompleteListener(task -> {
                     if (task.isSuccessful()) {
                         UserModel sender = task.getResult().toObject(UserModel.class);
                         if (sender != null) {
-                            // Criar a Intent que será aberta ao clicar na notificação
                             Intent intent = new Intent(this, ChatActivity.class);
                             AndroidUtil.passUserModelAsIntent(intent, sender);
                             intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
 
-                            PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent,
+                            PendingIntent pendingIntent = PendingIntent.getActivity(this, notificationId, intent,
                                     PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_IMMUTABLE);
 
-                            // Construir a notificação
                             NotificationCompat.Builder notificationBuilder = new NotificationCompat.Builder(this, "chat_messages")
                                     .setContentTitle(title)
                                     .setContentText(body)
-                                    .setSmallIcon(R.drawable.ic_launcher_foreground) // Use um ícone apropriado
-                                    .setAutoCancel(true) // A notificação desaparecerá ao ser clicada
+                                    .setSmallIcon(R.drawable.chat_icon)
+                                    .setAutoCancel(true)
+                                    .setPriority(NotificationCompat.PRIORITY_HIGH)
                                     .setContentIntent(pendingIntent);
 
                             NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
 
-                            // Criar o canal de notificação para Android 8.0+
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                                 NotificationChannel channel = new NotificationChannel("chat_messages", "Chat Messages",
                                         NotificationManager.IMPORTANCE_DEFAULT);
                                 manager.createNotificationChannel(channel);
                             }
 
-                            // Exibir a notificação
-                            manager.notify(0, notificationBuilder.build());
+                            manager.notify(notificationId, notificationBuilder.build());
                         }
                     }
                 });
