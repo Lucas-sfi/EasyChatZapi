@@ -3,6 +3,7 @@ package com.example.easychat.adapter;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -34,25 +35,19 @@ public class RecentChatRecyclerAdapter extends FirestoreRecyclerAdapter<Chatroom
     @Override
     protected void onBindViewHolder(@NonNull ChatroomModelViewHolder holder, int position, @NonNull ChatroomModel model) {
 
-        Intent intent = new Intent(context, ChatActivity.class);
-        intent.putExtra("chatroomId", model.getChatroomId());
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-
-        boolean hasCustomNotif = model.getCustomNotificationStatus()
-                .getOrDefault(FirebaseUtil.currentUserId(), false);
-
+        // Limpa listeners antigos para evitar duplicação
         if (holder.unreadCountListener != null) {
             holder.unreadCountListener.remove();
         }
 
-        // CORREÇÃO: ATUALIZA A PRÉVIA DA MENSAGEM E O HORÁRIO IMEDIATAMENTE
+        boolean hasCustomNotif = model.getCustomNotificationStatus()
+                .getOrDefault(FirebaseUtil.currentUserId(), false);
+
+        // Atualiza a prévia da mensagem e o horário
         boolean lastMessageSentByMe = model.getLastMessageSenderId().equals(FirebaseUtil.currentUserId());
         String lastMessage = model.getLastMessage();
-
-        // Garante que a prévia não seja nula ou vazia
         if(lastMessage == null) lastMessage = "";
 
-        // Adiciona "You: " para mensagens enviadas em chats individuais
         if (lastMessageSentByMe && !model.isGroupChat()) {
             holder.lastMessageText.setText("You: " + lastMessage);
         } else {
@@ -66,6 +61,13 @@ public class RecentChatRecyclerAdapter extends FirestoreRecyclerAdapter<Chatroom
             holder.statusIndicator.setVisibility(View.GONE);
             holder.unreadCountText.setVisibility(View.GONE);
             holder.itemView.setBackground(ContextCompat.getDrawable(context, R.drawable.edit_text_rounded_corner));
+
+            holder.itemView.setOnClickListener(v -> {
+                Intent intent = new Intent(context, ChatActivity.class);
+                intent.putExtra("chatroomId", model.getChatroomId());
+                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(intent);
+            });
         } else {
             FirebaseUtil.getOtherUserFromChatroom(model.getUserIds())
                     .get().addOnSuccessListener(documentSnapshot -> {
@@ -90,34 +92,44 @@ public class RecentChatRecyclerAdapter extends FirestoreRecyclerAdapter<Chatroom
                                         }
                                     });
 
-                            AndroidUtil.passUserModelAsIntent(intent, otherUserModel);
-
+                            // Listener para contagem de mensagens não lidas
                             String chatroomId = FirebaseUtil.getChatroomId(FirebaseUtil.currentUserId(), otherUserModel.getUserId());
                             holder.unreadCountListener = FirebaseUtil.getChatroomMessageReference(chatroomId)
                                     .whereEqualTo("senderId", otherUserModel.getUserId())
                                     .whereEqualTo("status", ChatMessageModel.STATUS_SENT)
                                     .addSnapshotListener((querySnapshot, e) -> {
-                                        if (e != null || querySnapshot == null) return;
-
-                                        int unreadCount = querySnapshot.size();
-                                        if (unreadCount > 0) {
-                                            holder.unreadCountText.setText(String.valueOf(unreadCount));
-                                            holder.unreadCountText.setVisibility(View.VISIBLE);
-                                        } else {
-                                            holder.unreadCountText.setVisibility(View.GONE);
+                                        if (e != null) {
+                                            Log.e("RecentChatAdapter", "Listen failed.", e);
+                                            return;
                                         }
 
-                                        if (hasCustomNotif && unreadCount > 0) {
-                                            holder.itemView.setBackground(ContextCompat.getDrawable(context, R.drawable.list_item_background_highlight));
-                                        } else {
-                                            holder.itemView.setBackground(ContextCompat.getDrawable(context, R.drawable.edit_text_rounded_corner));
+                                        if (querySnapshot != null) {
+                                            int unreadCount = querySnapshot.size();
+                                            if (unreadCount > 0) {
+                                                holder.unreadCountText.setText(String.valueOf(unreadCount));
+                                                holder.unreadCountText.setVisibility(View.VISIBLE);
+                                            } else {
+                                                holder.unreadCountText.setVisibility(View.GONE);
+                                            }
+
+                                            // Lógica de destaque da notificação
+                                            if (hasCustomNotif && unreadCount > 0) {
+                                                holder.itemView.setBackground(ContextCompat.getDrawable(context, R.drawable.list_item_background_highlight));
+                                            } else {
+                                                holder.itemView.setBackground(ContextCompat.getDrawable(context, R.drawable.edit_text_rounded_corner));
+                                            }
                                         }
                                     });
+
+                            holder.itemView.setOnClickListener(v -> {
+                                Intent intent = new Intent(context, ChatActivity.class);
+                                AndroidUtil.passUserModelAsIntent(intent, otherUserModel);
+                                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                context.startActivity(intent);
+                            });
                         }
                     });
         }
-
-        holder.itemView.setOnClickListener(v -> context.startActivity(intent));
     }
 
     @NonNull
@@ -128,10 +140,23 @@ public class RecentChatRecyclerAdapter extends FirestoreRecyclerAdapter<Chatroom
     }
 
     @Override
+    public void onDetachedFromRecyclerView(@NonNull RecyclerView recyclerView) {
+        super.onDetachedFromRecyclerView(recyclerView);
+        // Limpa todos os listeners quando o adapter é desanexado
+        for (int i = 0; i < getItemCount(); i++) {
+            ChatroomModelViewHolder holder = (ChatroomModelViewHolder) recyclerView.findViewHolderForAdapterPosition(i);
+            if (holder != null && holder.unreadCountListener != null) {
+                holder.unreadCountListener.remove();
+            }
+        }
+    }
+
+    @Override
     public void onViewRecycled(@NonNull ChatroomModelViewHolder holder) {
         super.onViewRecycled(holder);
         if (holder.unreadCountListener != null) {
             holder.unreadCountListener.remove();
+            holder.unreadCountListener = null;
         }
     }
 

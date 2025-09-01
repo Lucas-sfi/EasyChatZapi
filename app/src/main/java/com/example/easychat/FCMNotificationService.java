@@ -8,9 +8,7 @@ import android.content.Intent;
 import android.os.Build;
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
-import com.example.easychat.model.UserModel;
-import com.example.easychat.utils.AndroidUtil;
-import com.example.easychat.utils.FirebaseUtil;
+
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
@@ -20,53 +18,50 @@ public class FCMNotificationService extends FirebaseMessagingService {
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
         super.onMessageReceived(remoteMessage);
 
-        if (remoteMessage.getNotification() == null) return;
+        if (remoteMessage.getNotification() == null || remoteMessage.getData().isEmpty()) {
+            return;
+        }
 
         String title = remoteMessage.getNotification().getTitle();
         String body = remoteMessage.getNotification().getBody();
         String userId = remoteMessage.getData().get("userId");
         String chatroomId = remoteMessage.getData().get("chatroomId");
 
-        if (userId == null || chatroomId == null) return;
+        if (userId == null || chatroomId == null) {
+            return;
+        }
 
         if (chatroomId.equals(ChatActivityState.getActiveChatroomId())) {
             return;
         }
 
-        // Usa um ID numérico consistente baseado no chatroomId
         int notificationId = chatroomId.hashCode();
 
-        FirebaseUtil.allUserCollectionReference().document(userId).get()
-                .addOnCompleteListener(task -> {
-                    if (task.isSuccessful()) {
-                        UserModel sender = task.getResult().toObject(UserModel.class);
-                        if (sender != null) {
-                            Intent intent = new Intent(this, ChatActivity.class);
-                            AndroidUtil.passUserModelAsIntent(intent, sender);
-                            intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        // Ponto chave: A Intent agora aponta para a MainActivity.
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.putExtra("userId", userId);
+        intent.putExtra("chatroomId", chatroomId);
+        intent.putExtra("username", title); // Passamos o nome de usuário para evitar buscas extras
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
 
-                            PendingIntent pendingIntent = PendingIntent.getActivity(this, notificationId, intent,
-                                    PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_IMMUTABLE);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, notificationId, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-                            NotificationCompat.Builder notificationBuilder = new NotificationCompat.Builder(this, "chat_messages")
-                                    .setContentTitle(title)
-                                    .setContentText(body)
-                                    .setSmallIcon(R.drawable.chat_icon)
-                                    .setAutoCancel(true)
-                                    .setPriority(NotificationCompat.PRIORITY_HIGH)
-                                    .setContentIntent(pendingIntent);
+        NotificationCompat.Builder notificationBuilder = new NotificationCompat.Builder(this, "chat_messages")
+                .setContentTitle(title)
+                .setContentText(body)
+                .setSmallIcon(R.drawable.chat_icon)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true); // O sistema cancela a notificação ao ser tocada
 
-                            NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
 
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                NotificationChannel channel = new NotificationChannel("chat_messages", "Chat Messages",
-                                        NotificationManager.IMPORTANCE_DEFAULT);
-                                manager.createNotificationChannel(channel);
-                            }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel("chat_messages", "Chat Messages", NotificationManager.IMPORTANCE_HIGH);
+            manager.createNotificationChannel(channel);
+        }
 
-                            manager.notify(notificationId, notificationBuilder.build());
-                        }
-                    }
-                });
+        manager.notify(notificationId, notificationBuilder.build());
     }
 }
